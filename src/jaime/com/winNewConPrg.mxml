@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- http://blog.flexexamples.com/2009/10/23/displaying-a-popup-spark-titlewindow-container-in-flex-4/ -->
+<s:TitleWindow name="winDelUser"
+			   xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/halo"
+			   title="Eliinar Usuario"
+			   width="158" height="116"
+			   close="ttlWndw_close(event);">
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.events.Event;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			[Bindable]
+			public var dpDigsControlables:ArrayCollection
+			
+			public var gateway : RemotingConnection;
+			
+			public var pKONkey:int
+			public var pWeb:int
+			public var pKon:int
+			
+			protected function ttlWndw_close(evt:CloseEvent):void {
+				PopUpManager.removePopUp(evt.currentTarget as IFlexDisplayObject);
+				
+			}
+			private function cbChangeHand(ev:Event):void
+			{
+			
+				trace("click selected "+ dpDigsControlables.getItemAt(cbControls.selectedIndex).label)
+				var normState:int  = dpDigsControlables.getItemAt(cbControls.selectedIndex).dig_norm_state
+				var valAct:int = dpDigsControlables.getItemAt(cbControls.selectedIndex).dig_value;
+				rbAbrir.enabled = true
+				rbCerrar.enabled = true
+				if(normState == 0)
+				{
+					rbAbrir.selected = false
+					rbCerrar.selected = true	
+					lbHoraAction.text = "Hora de Cerrar:"
+					lbHoraNorm.text = "Hora de Abrir:"
+				}
+				else if(normState ==1)
+				{
+					rbAbrir.selected = true
+					rbCerrar.selected = false	
+					lbHoraAction.text = "Hora de Abrir:"
+					lbHoraNorm.text = "Hora de Cerrar:"
+				}
+				btnDelete.enabled = true
+			}
+			private function btnDelClikHand(ev:Event):void
+			{
+				var mo:String = lun.selected? "t" : "f";
+				var tu:String = mar.selected? "t" : "f";
+				var we:String = mie.selected? "t" : "f";
+				var th:String = jue.selected? "t" : "f";
+				var fr:String = vie.selected? "t" : "f";
+				var sa:String = sab.selected? "t" : "f";
+				var su:String = dom.selected? "t" : "f";
+				var name:String = dpDigsControlables.getItemAt(cbControls.selectedIndex).label
+				var konNum:int = dpDigsControlables.getItemAt(cbControls.selectedIndex).dig_kon_num	
+				var state:int = (rbCerrar.selected == true)? 1 : 0;
+				var houOpen:int = horaAbrir.value * 3600 + minAbrir.value * 60 + segAbrir.value
+				var stOpen:String = String(horaAbrir.value)+":"+String(minAbrir.value)+":"+String(segAbrir.value);
+				var houClose:int = horaCerrar.value * 3600 + minCerrar.value * 60 + segCerrar.value
+				var stClose:String = String(horaCerrar.value)+":"+String(minCerrar.value)+":"+String(segCerrar.value);
+					trace ("diferencia de hora: "+(houClose-houOpen));
+					
+				//gw.call("controles.insertPrgKon",doPrgCtrl,this.Name,this.kon_num,0,comment,lun,mar,mie,jue,vie,sab,dom,stOpen,stClose)
+				trace ("Call to insertPrgKon: "+pKONkey+" | "+pWeb+" | "+pKon+" | "+name+" | "+konNum+" | "+state+" | "+comment.text+" | "+
+					mo+" | "+tu+" | "+we+" | "+th+" | "+fr+" | "+sa+" | "+su+" | "+stOpen+" | "+stClose)	
+				gateway.call( "controles.insertPrgKon", new Responder(onInserCntrlPrg, onFault),pKONkey,pWeb,pKon,
+																								name,konNum,state,comment.text,
+																								mo,tu,we,th,fr,sa,su,stOpen,stClose);	
+			}
+			private function rbChangeAction(ev:Event):void
+			{
+				trace("cambio "+ev.currentTarget.id+" a: "+ev.currentTarget.selected)
+				switch (ev.currentTarget.id)
+				{
+					case "rbAbrir":
+						lbHoraAction.text = "Hora de Abrir:"
+						lbHoraNorm.text = "Hora de Cerrar:"
+						break
+					case "rbCerrar":
+						lbHoraAction.text = "Hora de Cerrar:"
+						lbHoraNorm.text = "Hora de Abrir:"
+						break
+					
+				}
+			}
+			private function onInserCntrlPrg(result:Boolean):void
+			{
+				if(result)
+				{
+					//var target:DisplayObject = padre.parent.getChildByName("actual");
+					//padre.parent.removeChild(target)
+					trace("padre: "+this.parent.name)
+					parentApplication.initPrgKon();
+					PopUpManager.removePopUp(this);
+				}
+				trace("resultado "+result)
+			}
+			private function onFault( fault : String ) : void
+			{
+				trace( "Falla update kontrol programado: "+fault );
+			}
+		]]>
+	</fx:Script>
+
+	
+	<s:Label id="lbMsgEliminar" x="6" y="10" width="139" height="46" fontWeight="bold"
+			 text="Eliminar" textAlign="center"/>
+	<s:Button id="btnDelete" x="10" y="57" label="Eliminar" width="136" fontWeight="bold" enabled="false" click="btnDelClikHand(event)"/>
+	
+	
+	
+	
+</s:TitleWindow>

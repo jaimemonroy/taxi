@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!-- itemRenderers\sparkmx\myComponents\CHeditor.mxml -->
+<s:MXDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						  xmlns:s="library://ns.adobe.com/flex/spark" 
+						  xmlns:mx="library://ns.adobe.com/flex/mx">
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.events.Event;
+			public var myRetVal:Boolean = false;
+			private function changeHandler(ev:Event):void
+			{
+				myRetVal=ev.currentTarget.selected;
+				data.incBool = ev.currentTarget.selected;
+				trace("un check cambio: "+data.indice)
+			}
+		]]>
+	</fx:Script>
+	<mx:HBox horizontalAlign="center" >
+	<s:CheckBox id="myCH"
+				selected="{data.incBool}"
+				change="changeHandler(event);"/>
+	</mx:HBox>	
+</s:MXDataGridItemRenderer>

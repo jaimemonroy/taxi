@@ -1,0 +1,1039 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" 
+			   xmlns:com="jaime.com.*"
+			   width="100%" height="100%" creationComplete="doCreationComplete()">
+	
+<!--	<fx:Style>
+		@namespace "library://ns.adobe.com/flex/spark";
+		Panel
+		{
+			skinClass:ClassReference("PanelImage");
+		}
+	</fx:Style> -->
+	<fx:Script>
+		<![CDATA[
+			
+			import com.hurlant.crypto.hash.MD5;
+			import com.hurlant.crypto.symmetric.NullPad;
+			import com.hurlant.util.Hex;
+			import com.hurlant.util.der.Integer;
+			
+			import flash.events.TimerEvent;
+			import flash.utils.Timer;
+			
+			import jaime.com.ConnectionManager;
+			import jaime.com.EventoCustom;
+			import jaime.com.UpdateServers;
+			import jaime.com.winDeleteUser;
+			import jaime.com.winEditServCli;
+			import jaime.com.winEditUser;
+			
+			import mx.collections.ArrayCollection;
+			import mx.effects.easing.*;
+			import mx.events.FlexEvent;
+			import mx.events.IndexChangedEvent;
+			import mx.managers.PopUpManager;
+			import mx.utils.ObjectProxy;
+			import mx.utils.URLUtil;
+			
+			import spark.events.TextOperationEvent;
+			
+			[Bindable]
+			private var acEmpty:ArrayCollection
+			
+			[Bindable]	
+			private var acUsrsData:ArrayCollection
+			[Bindable]	
+			private var acClientId:ArrayCollection
+			[Bindable]	
+			private var acCities:ArrayCollection
+			[Bindable]	
+			private var acRoles:ArrayCollection
+			[Bindable]	
+			private var acServClientData:ArrayCollection
+			[Bindable]
+			private var acDrivers:ArrayCollection
+			[Bindable]
+			private var currUser:Object
+			private var numSrvrs:int 
+			private var serverName:String="";
+			private var nameSrv1:String="";
+			private var nameSrv2:String="";
+			private var gateway0 : RemotingConnection;	//main server and the only used if there is olu one aailaible
+			private var gateway1 : RemotingConnection;	//second server only used if available (obviusly) if so, numServrs = 2
+			private var firstRun:Boolean=false
+			private var fromDate:Date = new Date()
+			private var toDate:Date = new Date()
+				
+				
+			private function doCreationComplete():void
+			{
+				serverName = mx.utils.URLUtil.getServerNameWithPort(url);
+				numSrvrs =1;
+				fromDate.hours = 0;
+				fromDate.minutes =0;
+				fromDate.seconds=0;		
+				toDate.time = fromDate.time + 2*24*60*60*1000;
+				/*switch (serverName)
+				{
+					case ""+serverName+"":
+						nameSrv1 = "web"
+					break
+					case "192.168.229.149":
+						nameSrv1 = "clm"
+					break
+					case "otra IP":
+						nameSrv1 = "bqt";
+					break
+				}*/
+				mensajePsw.text="Buscando servidores.. "
+					user.enabled=false
+					password.enabled=false	
+				gateway0 = new RemotingConnection( "http://"+serverName+"/amfphp-2.1.1/Amfphp/")	
+				switch (serverName)	
+				{
+					case "": //debugging..
+						trace("debuggin ")
+						gateway0 = new RemotingConnection( "http://192.168.1.104/amfphp-2.1.1/Amfphp/")
+						mensajePsw.text="We are just debuging.. like a web connected with local available "
+						gateway0.call( "servidor.identificacion",new Responder(onResultLocalW, onFaultLocalW))
+						
+						break
+					case "www.transportequiroga.com.ve":	//is web, before assign gateway0 check if local available 
+						/*gateway0 = new RemotingConnection( "http://192.168.229.129/amfphp-2.1.1/Amfphp/")
+						gateway0.call( "servidor.identificacion",new Responder(onResultLocal, onFaultLocal))*/
+						numSrvrs = 1;
+						nameSrv1 = "web";
+						user.enabled=true
+						password.enabled=true
+						mensajePsw.text=" Servidor activo: web"
+					break;	
+					case "transportequiroga.com.ve":
+						numSrvrs = 1;
+						nameSrv1 = "web";
+						user.enabled=true
+						password.enabled=true
+						mensajePsw.text=" Servidor activo: web"
+					break	
+					case "192.168.1.104":	//is one local server, first figure ou what it is ..
+						//gateway0 = new RemotingConnection( "http://"+serverName+"/amfphp-2.1.1/Amfphp/")	
+						//gateway0 = new RemotingConnection( "http://192.168.229.3/amfphp-2.1.1/Amfphp/")
+						gateway0.call( "servidor.identificacion",new Responder(onResultLocalW, onFaultLocalW))
+						
+					break	
+					default:	//like web (compile this version for the resident on web)
+						numSrvrs = 1;
+						nameSrv1 = "web";
+						gateway0 = new RemotingConnection( "http://"+serverName+"/amfphp-2.1.1/Amfphp/")
+					break
+				}				
+			}
+			
+		
+			
+			private function onResultLocalW(res:String):void
+			{
+				if(res == "clm" || res == "bqt")
+				{
+					nameSrv1 = res
+					//now lets try to reach web server
+					var urlChecker:URLChecker = new URLChecker();
+					urlChecker.addEventListener(Event.COMPLETE, urlChecked);
+					urlChecker.check('http://transportequiroga.com.ve');
+				}
+				
+			}
+			
+			
+			private function urlChecked(event:Event):void
+			{
+				trace('is Live: ' + event.target.isLive);
+				//trace('log: ' + event.target.log);
+				if(event.target.isLive)
+				{
+					gateway1 = new RemotingConnection( "http://www.transportequiroga.com.ve/amfphp-2.1.1/Amfphp/")
+					gateway1.call( "servidor.identificacion",new Responder(onResultWeb, onFaultWeb))
+				}
+				else
+				{
+					mensajePsw.text=" Servidor activo: "+nameSrv1+" (Web no disponible)"
+					user.enabled=true
+					password.enabled=true	
+				}
+					/*gateway1 = new RemotingConnection( "http://www.transportequiroga.com.ve/amfphp-2.1.1/Amfphp/")
+				gateway1.call( "servidor.identificacion",new Responder(onResultWeb, onFaultWeb))*/
+				
+			}
+			
+			private function onFaultLocalW(err:String):void
+			{
+				trace("Fatal error no server available so exit.. "+err)
+				mensajePsw.text=" Ningun servidor activo.."
+			}
+			
+			private function onResultWeb(res:String):void
+			{
+				if(res == "web")
+				{
+					trace("Called from local but also there was Web available..")
+					nameSrv2 = res
+					numSrvrs = 2;	
+					mensajePsw.text=serverName+" Servidores activos: "+nameSrv1+"  and "+	nameSrv2
+					user.enabled=true
+					password.enabled=true	
+				}
+			}
+			
+			private function onFaultWeb(err:String):void{
+				trace("Called from local, no web available.. "+err)
+				numSrvrs = 1;
+				mensajePsw.text=serverName+" Active Server(s): "+nameSrv1
+			}
+			
+			private function enterHandler(ev:Event):void
+			{
+				var md5:MD5 = new MD5;
+				var str1:String = Hex.fromString(user.text)
+				var str2:String = Hex.fromString(password.text)	
+				var src1:ByteArray = Hex.toArray(str1);	
+				var src2:ByteArray = Hex.toArray(str2);
+				var digest1:ByteArray = md5.hash(src1);
+				var digest2:ByteArray = md5.hash(src2);
+				var strU:String = Hex.fromArray(digest1)
+				var strP:String = Hex.fromArray(digest2)
+
+				gateway0.call( "universalDBUpd.verifyUser", new Responder(onResultPsw, onFaultUser),user.text,strP);	
+			}
+			
+			
+			private function onResultPsw(result:Object):void
+			{
+				this.currUser = result;
+				if(currUser.valid == 1)
+				{
+					this.currUser.cedula=user.text
+					trace ("se logio: "+this.currUser.name+" con rol: "+this.currUser.role+" Cedula:"+this.currUser.cedula)
+					myViewStack.selectedChild = mainTree;
+					if(this.firstRun)
+					{
+						trace("llamando a set User access desde psw")
+						setUserAccess()
+					}
+					else
+					{
+						this.firstRun=true
+					}
+		
+					
+				}
+				else
+				{	
+					mensajePsw.text = "Cédula / Clave Invalida"
+				}
+			}
+			private function setMenu():void
+			{
+				trace("accordion num clidren: "+acMainMenu.numChildren)
+				for (var i:int=0; i<acMainMenu.numChildren;i++)
+				acMainMenu.selectedIndex = i
+				setUserAccess()	
+			}
+
+			private function acClickHandler(ev:MouseEvent):void
+			{
+				if(this.currUser.role == 1 && ev.currentTarget.selectedIndex == 2)
+				{
+					trace("exit from client")
+					vsRight.selectedChild = ncrMainImage;
+					acMainMenuClient.selectedIndex = 0	//acMainMenuClient.numChildren
+					myViewStack.selectedChild = ncLogin
+					user.text=""
+					password.text=""
+				}
+				if(this.currUser.role != 1 && ev.currentTarget.selectedIndex == 6)
+				{
+					trace("exit from not client")
+					vsRight.selectedChild = ncrMainImage;
+					acMainMenu.selectedIndex = acMainMenu.numChildren-1
+					myViewStack.selectedChild = ncLogin
+					user.text=""
+					password.text=""
+				}
+				
+				//acMainMenu.selectedIndex
+			}
+			private function btnsProcess(ev:MouseEvent):void
+			{
+				trace("click boton: "+ev.currentTarget.name)
+				switch(ev.currentTarget.name)
+				{
+					case "btn5_1":	//lista de Usuarios
+						//lbCurrOption.text = "Lista de Usuarios"
+						vsRight.selectedChild = ncrUserList;
+						getAllUsrList()
+						break
+					case "btn5_2":	//lista de usuarios editable
+						//lbCurrOption.text = "Lista de Usuarios"
+						vsRight.selectedChild = ncrUserListEdit;
+						getAllUsrList()
+					break
+					case "btn6_1":
+						//lbCurrOption.text = "Cambiar Clave"
+						vsRight.selectedChild = ncrChangePsw
+					break
+					case "btn7_1":
+						//lbCurrOption.text = "lista de servicios/cliente"
+						vsRight.selectedChild =this.ncrClientListEdit
+						getClientServiceslist();
+					break;	
+					case "btn8_1":
+						//lbCurrOption.text = "Cambiar Clave"
+						vsRight.selectedChild = ncrChangePsw
+					break	
+				}
+			}
+			
+	
+			private function setUserAccess():void
+			{
+				trace("set user access called for role: "+this.currUser.role)
+				//rightPanel.title = "Usuario: "+this.currUser.name
+				
+				coordinar.enabled=false;
+				
+				tarifar.enabled=false;
+				facturar.enabled=false;
+				datos.enabled=false;
+				usuarios.enabled=false;
+				
+				salir.enabled=true;
+				
+				switch(this.currUser.role)
+				{
+					case "1":
+						trace ("nothing for client here")	
+						ViewStackTrees.selectedChild=this.ncClient
+						break
+					case "4":	//coordinador
+						ViewStackTrees.selectedChild=this.ncNoClient
+						coordinar.enabled=true
+						datos.enabled=true
+						break
+					case "7":	//tarifador
+						ViewStackTrees.selectedChild=this.ncNoClient
+						coordinar.enabled=true
+						tarifar.enabled=true
+						datos.enabled=true
+						break
+					case "10":	//facturador
+						ViewStackTrees.selectedChild=this.ncNoClient
+						coordinar.enabled=true
+						tarifar.enabled=true
+						facturar.enabled=true
+						datos.enabled=true
+						break	
+					case "13":	//Gerente
+						ViewStackTrees.selectedChild=this.ncNoClient
+						coordinar.enabled=true
+						tarifar.enabled=true
+						facturar.enabled=true
+						usuarios.enabled=true
+						
+						datos.enabled=true
+						break
+					case "20":	//Administrador
+						ViewStackTrees.selectedChild=this.ncNoClient
+						coordinar.enabled=true
+						tarifar.enabled=true
+						facturar.enabled=true
+						usuarios.enabled=true
+						
+						datos.enabled=true
+						break
+					case "30":	//Administrador
+						ViewStackTrees.selectedChild=this.ncNoClient
+						coordinar.enabled=true
+						tarifar.enabled=true
+						facturar.enabled=true
+						usuarios.enabled=true
+						
+						datos.enabled=true
+						break
+				}
+			}
+/*
+*		Functions to drive user edit-delete options			
+*/
+			public function refreshAllUsrList():void
+			{
+				var emptyArr:Array = new Array()
+				var query:String = "SELECT * FROM users WHERE status = '1' ORDER BY cedula"	
+				acEmpty = new ArrayCollection(emptyArr) 
+				gateway0.call( "universalDBUpd.exQuery" , new Responder(onResultListUsrs, onFaultUserList),query)
+			}
+			public function callAddUsr(_cedula:String):void
+			{
+				trace("Click boton añadir usuario Cedula: "+_cedula)
+				var winNew:winEditUser = PopUpManager.createPopUp(this, winEditUser, true) as winEditUser;
+				winNew.cedula = _cedula
+				winNew.usrId = getUserindex(_cedula)	
+				winNew.gateway0 = this.gateway0
+				winNew.gateway1 = this.gateway1
+				winNew.numServ = this.numSrvrs
+				winNew.serv1Name = this.nameSrv1
+				winNew.serv2Name = this.nameSrv2
+				winNew.acDataAllUsrs = this.acUsrsData
+				winNew.acDataClientId = this.acClientId
+				winNew.acDataCities = this.acCities	
+				winNew.acNiveles = this.acRoles;	
+				winNew.setNewEdit(false);	
+				trace("internal users al index: "+getUserindex(_cedula))
+				//winDelete.setLabelTxt("Borrar usuario "+this.acUsrsData.getItemAt(getUserindex(uId)).nombre+"?")
+				
+				PopUpManager.centerPopUp(winNew)
+			}
+			public function callDelUsr(_cedula:String):void
+			{
+				trace("Click boton borrar usuario cedula: "+_cedula)
+				var winDelete:winDeleteUser = PopUpManager.createPopUp(this, winDeleteUser, true) as winDeleteUser;
+				winDelete.cedula=_cedula
+				winDelete.gateway0 = this.gateway0
+				winDelete.gateway1 = this.gateway1
+				winDelete.numServ = this.numSrvrs
+				winDelete.serv1Name = this.nameSrv1
+				winDelete.serv2Name = this.nameSrv2
+				trace("internal users al index: "+getUserindex(_cedula))
+				winDelete.setLabelTxt("Borrar usuario "+this.acUsrsData.getItemAt(getUserindex(_cedula)).nombre+"?")
+				
+				PopUpManager.centerPopUp(winDelete)	
+				
+				
+			}
+			public function callEditUsr(_cedula:String):void
+			{
+				trace("Click boton editar usuario cedula: "+_cedula)
+				var winEdit:winEditUser = PopUpManager.createPopUp(this, winEditUser, true) as winEditUser;
+				winEdit.cedula=_cedula
+				winEdit.usrId = getUserindex(_cedula)	
+				winEdit.gateway0 = this.gateway0
+				winEdit.gateway1 = this.gateway1
+				winEdit.numServ = this.numSrvrs
+				winEdit.serv1Name = this.nameSrv1
+				winEdit.serv2Name = this.nameSrv2
+				winEdit.acDataAllUsrs = this.acUsrsData
+				winEdit.acDataClientId = this.acClientId	
+				winEdit.acDataCities = this.acCities	
+				winEdit.acNiveles = this.acRoles;
+				winEdit.setNewEdit(true);	
+				trace("internal users al index: "+getUserindex(_cedula))
+				//winDelete.setLabelTxt("Borrar usuario "+this.acUsrsData.getItemAt(getUserindex(uId)).nombre+"?")
+				
+				PopUpManager.centerPopUp(winEdit)	
+			}
+			
+/*
+			direct events handlers
+*/
+			
+			protected function vsRight_changeHandler(event:IndexChangedEvent):void
+			{
+				// IMPORTAT: this works only in this order which is the order of stacks
+				trace("viiiew stack change to index: "+event.currentTarget.selectedIndex)
+				switch(event.currentTarget.selectedIndex)
+				{
+					case 0:
+						
+					break
+					case 1:
+						
+					break
+					case 2:
+					
+					break
+					case 3:		//change password, reset form
+						tiNewPsw.text=""
+						tiRepeatPsw.text=""
+						btnCangePsw.enabled=false
+						lbPaswStrenght.text=""
+					break	
+					case 4:	// list os services/clients
+						
+						
+					break;	
+						
+				}
+				
+			}
+			/*
+				FUNCTIONS TO DRIVE CHANGE PASSWORD
+			*/
+			protected function form1_creationCompleteHandler(event:FlexEvent):void
+			{
+				// TODO Auto-generated method stub
+				tiNewPsw.text=""
+				tiRepeatPsw.text=""
+				btnCangePsw.enabled=false	
+				
+			}
+			
+			
+			protected function tiNewPsw_changeHandler(event:TextOperationEvent):void
+			{
+				// TODO Auto-generated method stub
+				lbPaswStrenght.text = fStart(this.currUser.cedula,event.target.text)
+				if(tiNewPsw.text == tiRepeatPsw.text && (lbPaswStrenght.text == "Regular" || lbPaswStrenght.text == "Fuerte" ))
+					btnCangePsw.enabled=true
+				else
+					btnCangePsw.enabled=false		
+			}
+			protected function tiRepeatPsw_changeHandler(event:TextOperationEvent):void
+			{
+				// TODO Auto-generated method stub
+				if(tiNewPsw.text == tiRepeatPsw.text && (lbPaswStrenght.text == "Regular" || lbPaswStrenght.text == "Fuerte" ))
+					btnCangePsw.enabled=true
+				else
+					btnCangePsw.enabled=false
+			}
+			
+			protected function btnCangePsw_clickHandler(ev:MouseEvent):void
+			{
+				var md5:MD5 = new MD5;
+				var str2:String = Hex.fromString(tiNewPsw.text)						
+				var src2:ByteArray = Hex.toArray(str2);
+				var digest2:ByteArray = md5.hash(src2);
+				var strP:String = Hex.fromArray(digest2)
+				var auxObj:Array = new Array({name:'clave',value:strP})
+				var updateSrv:UpdateServers = new UpdateServers(gateway0,gateway1,
+																"users",
+																auxObj,
+																"cedula",this.currUser.cedula,
+																"CLAVE CAMBIADA EXITOSAMENTE, INGRESE NUEVAMENTE",
+																this.numSrvrs,this.nameSrv1,this.nameSrv2)
+				updateSrv.addEventListener(EventoCustom.EVENT_CUSTOM,onEventCustom)		
+			}
+			private function onEventCustom(ev:EventoCustom):void
+				
+			{
+				//trace("proceso: "+ev.target.msgProcess)
+				if(ev.target.msgProcess == "END")
+				{
+					
+					this.lbChaPswMsgSrvs.text="";
+					
+					
+					vsRight.selectedChild = ncrMainImage;
+					acMainMenu.selectedIndex = acMainMenu.numChildren-1
+					myViewStack.selectedChild = ncLogin
+					user.text=""
+					password.text=""
+				}
+				else
+					lbChaPswMsgSrvs.text = ev.target.msgProcess
+			}	
+					
+			private function onResultChangePsw(re:Array):void
+			{
+				trace("exitoso cambio de password ")
+			}
+			
+			static public function fStart(vUserName : String,vInput : String):String
+			{
+				var vScore : int;
+				//	var vHasLetters : Array = vInput.match(/[a-zA-Z]+/);
+				var vHasNumbers : Array = vInput.match(/[0-9]+/g);
+				var vHasPunctuation : Array = vInput.match(/[^a-zA-Z0-9]+/);
+				var vHasCasing : Array = vInput.match(/[a-z]+.*[A-Z]+|[A-Z]+.*[a-z]+/);
+				var vResult : String="";
+				
+				if (vInput.length == 0) return "en Blanco";
+				
+				vScore += (vInput.length < 7 ? 0 : 1);
+				vScore += (vInput.length >= 12 ? 1 : 0);
+				vScore += (vInput.toLowerCase() == vUserName.toLowerCase() ? 0 : 1);
+				vScore += (vHasNumbers == null ? 0 : 1);
+				vScore += (vHasNumbers != null && vHasNumbers.length <= 4 ? 0 : 1);
+				vScore += (vHasPunctuation == null ? 0 : 1);
+				vScore += (vHasPunctuation != null && String(vHasPunctuation).length <= 2 ? 0 : 1);
+				vScore += (vHasCasing == null ? 0 : 1);
+				vScore += (vHasCasing != null && String(vHasCasing).length <= 2 ? 0 : 1);
+				
+				switch (vScore)
+				{
+					case 0:
+						vResult = "Débil";
+						break;
+					case 1:
+						vResult = "Débil";
+						break;
+					case 2:
+						vResult = "Débil";
+						break;
+					case 3:
+						vResult = "Débil";
+						break;
+					case 4:
+						vResult = "Débil";
+						break;
+					case 5:
+						vResult = "Regular";
+						break;
+					case 6:
+						vResult = "Regular";
+						break;
+					case 7:
+						vResult = "Fuerte";
+						break;
+					case 8:
+						vResult = "Fuerte";
+						break;
+					
+				}
+				return vResult;
+			}
+
+// process of clients services	
+			
+			public function callNewSrvCli(idSrv:String):void
+			{
+				 trace("crear nuevo servicio como: "+idSrv)
+				 	 
+			}
+			
+/*			private function chageDateSrvsUsrHandler(ev:Event):void
+			{
+				//trace("Change Date: "+ev.currentTarget.name)
+				fromDate = this.dfFecDesdeSrvUsr.selectedDate;
+				toDate = this.dfFecHastaSrvUsr.selectedDate;	
+				getClientServiceslist();
+			}*/
+			
+			private function getClientServiceslist():void
+			{	
+				trace("calling getUsersServList with: "+this.currUser.cedula+"  -- "+setDatesParams(fromDate,true)+"  -- "+setDatesParams(toDate,true))
+				gateway0.call( "universalDBUpd.getUsersServList",new Responder(onResultlistSers, onFaullistServ),this.currUser.cedula,setDatesParams(fromDate,true),setDatesParams(toDate,true))
+			}
+			private function onResultlistSers(result:Array):void
+			{
+				var now:Date = new Date()
+				var item:Object;
+				for each (item in result)
+				{
+					item.pasajeros = item.pasajeros.split(",").join("\n")
+					item.telfspax = item.telfspax.split(",").join("\n")
+					item.deletable 	=(item.fecha >= now)? true : false
+				}
+				for(var s:String in result) result[s] = new ObjectProxy(result[s]);
+				acServClientData= new ArrayCollection (result);
+	//			this.dfFecDesdeSrvUsr.selectedDate = fromDate;
+	//			this.dfFecHastaSrvUsr.selectedDate = toDate;
+			}
+			
+			protected function btnAgendarSrvCli_clickHandler(event:MouseEvent):void
+			{
+				// TODO Auto-generated method stub
+				trace ("open window new servicio/cliente")
+				var winNewSrvCli:winEditServCli = PopUpManager.createPopUp(this, winEditServCli, true) as winEditServCli;
+				
+				winNewSrvCli.gateway0 = this.gateway0
+				winNewSrvCli.gateway1 = this.gateway1
+				winNewSrvCli.numServ = this.numSrvrs
+				winNewSrvCli.serv1Name = this.nameSrv1
+				winNewSrvCli.serv2Name = this.nameSrv2
+				winNewSrvCli.userSec = currUser.sec;
+					
+				winNewSrvCli.setNewEdit(false);
+				
+				PopUpManager.centerPopUp(winNewSrvCli)
+			}
+			
+			private function onFaullistServ(fault:String):void
+			{
+				trace("AMFPHP: Fail on get list of services / client: "+fault)
+			}
+// Functions on fail and miscelaneus..
+
+			private function setDatesParams(cual:Date,quote:Boolean):String
+			{
+				var param:String="";
+				var aux:String= (quote)? "\"" : ""
+				
+				param = aux+cual.fullYear+"-"+
+					twoDigit(cual.month+1)+"-"+
+					twoDigit(cual.date)+" "+
+					twoDigit(cual.hours)+":"+
+					twoDigit(cual.minutes)+
+					":00"+aux;
+				return param
+			}
+			
+			private function twoDigit(val:int):String
+			{
+				var valStr:String = (String(val).length == 1)? "0"+String(val) : String(val) ;
+				return valStr;
+			}
+			
+			private function getUserindex(id:String):int
+			{
+				for(var i:int=0;i<this.acUsrsData.length;i++)
+				{
+					if( this.acUsrsData.getItemAt(i).cedula == id)
+						break
+				}
+				return i
+			}
+			private function onTestAmf(res:String):void
+			{
+				trace("Test AMFPHP resul: "+res);
+			}
+			private function onFaultAmf(fault : String ) : void
+			{
+				trace ("AMFPHP falla test: "+fault)
+				
+			}
+			private function onFaultUser (fault : String ) : void
+			{
+				trace ("AMFPHP falla verif. user "+fault)
+				mensajePsw.text += " and seems that web D.B. server is wrong.."
+			}
+			
+			private function  onFaultChangePsw (fault : String ) : void
+			{
+				trace ("AMFPHP falla query para modificar password "+fault)
+				//mensajePsw.text += " and seems that web D.B. server is wrong.."
+			}
+			
+			
+			
+			
+			
+			
+			
+		]]>
+	</fx:Script>
+	<fx:Script source="buildUsersList.as" />
+	<mx:ViewStack   id="myViewStack" borderStyle="solid" width="100%" height="100%" color="0x323232">
+		<!-- Login -->			
+		<s:NavigatorContent id="ncLogin"   width="100%" height="100%" fontWeight="bold" >
+			<mx:VBox id="login" verticalAlign="middle" horizontalAlign="center"  width="100%" height="100%" y="0">
+				
+				
+				<mx:Image id="imgLogin" source="./images/logo.png"  />	
+				<mx:HBox horizontalAlign="right"  width="200">
+					<s:Label  text="Cédula:" />
+					<s:TextInput  id="user" />
+				</mx:HBox>
+				<mx:HBox horizontalAlign="right" width="200">
+					<s:Label text="Clave:" />
+					<s:TextInput id="password" displayAsPassword="true" enter="enterHandler(event);" />
+				</mx:HBox>
+				<mx:Spacer height="12"/>
+				<s:Button id="btnEntrar" label="Entrar" width="148" x="507" click="enterHandler(event);"/>
+				<s:TextArea editable="false" selectable="false" textAlign="center" borderVisible="false" id="mensajePsw"  contentBackgroundAlpha="0.0" color="#FF0000" height="97" y="419"/>
+				
+			</mx:VBox>
+			
+		</s:NavigatorContent>
+		
+	 <s:NavigatorContent id="mainTree" backgroundColor="0xDCDCDC" width="100%" height="100%" fontWeight="bold"  >
+		 <s:layout>
+			 <s:HorizontalLayout horizontalAlign="left"  
+								 paddingTop="5" paddingLeft="5" 
+								 paddingRight="5" paddingBottom="5" />
+		 </s:layout>
+		 
+		 <s:Panel   id="leftPanel" width="20%" height="100%" 
+					color="#222222"  backgroundColor="#FFFFFF">
+			 
+			 
+			 <mx:ViewStack id="ViewStackTrees" borderStyle="solid" width="100%" height="100%" >			
+				 <s:NavigatorContent id="ncNoClient" >
+					 <s:BorderContainer width="100%" height="100%" borderStyle="inset">
+						 <s:layout>
+							 <s:VerticalLayout 
+								 
+								 paddingLeft="1" paddingRight="1" 
+								 paddingTop="1" paddingBottom="5"/>
+						 </s:layout>
+<!-- ACORDION DE NO CLIENTES -->						 
+						 <mx:Accordion  id="acMainMenu"
+										openEasingFunction="{Bounce.easeOut}" 
+										openDuration="1500"
+							 			width="100%" height="100%"
+										creationComplete="setMenu()"
+										activate="setMenu()"
+										click="acClickHandler(event)"
+										>
+							 <mx:Form id="coordinar" label="COORDINAR"  
+									  paddingBottom="0" paddingLeft="4" 
+									  paddingRight="4" paddingTop="8" 
+									  width="100%"  height="100%"
+									   >
+								<s:Button id="btn1_1" width="100%" height="40" label="Procesar Registro" click="btnsProcess(event)"  />					 
+								<s:Button id="btn1_2" width="100%" height="40" label="Día de la Semana" click="btnsProcess(event)"/>						 
+								<s:Button id="btn1_3" width="100%" height="40" label="Desde / Hasta" click="btnsProcess(event)"/>
+							 	<s:Button id="btn1_4" width="100%" height="40" label="Generar Correo" click="btnsProcess(event)"/>
+							 	<s:Button id="btn1_5" width="100%" height="40"  label="Servicios Pendientes" click="btnsProcess(event)"/>	
+								<s:Button id="btn1_6" width="100%" height="40" label="Servicios sin Cerrar" click="btnsProcess(event)"/>
+								<s:Button id="btn1_7" width="100%" height="40" label="Gráficas"/>
+								 
+							</mx:Form>	 
+							 <mx:Form id="tarifar" label="TARIFAR" 
+									  paddingBottom="0" paddingLeft="4" 
+									  paddingRight="4" paddingTop="8" 
+									  width="100%"  height="100%"
+									  >
+								 <s:Button id="btn2_1" width="100%" height="40" label="Tarifar Cliente" click="btnsProcess(event)"/>
+								 <s:Button id="btn2_2" width="100%" height="40" label="Servicios no Tarifados" click="btnsProcess(event)"/>
+								 <s:Button id="btn2_3" width="100%" height="40" label="Servicios no Tarifados" click="btnsProcess(event)"/>
+								 <s:Button id="btn2_4" width="100%" height="40" label="Tarifar Pagos" click="btnsProcess(event)"/>
+								 <s:Button id="btn2_5" width="100%" height="40" label="Relacionar Cliente" click="btnsProcess(event)"/>
+								 <s:Button id="btn2_6" width="100%" height="40" label="Relacionar Pagos" click="btnsProcess(event)"/>
+								 <s:Button id="btn2_7" width="100%" height="40" label="Tarifa Rutas" click="btnsProcess(event)"/>
+								 <s:Button id="btn2_8" width="100%" height="40" label="Tarifa General" click="btnsProcess(event)"/>
+								 <s:Button id="btn2_9" width="100%" height="40" label="Gráficas" click="btnsProcess(event)"/>
+							 </mx:Form> 
+							 <mx:Form id="facturar" label="FACTURAR" 
+									  paddingBottom="0" paddingLeft="4" 
+									  paddingRight="4" paddingTop="8" 
+									  width="100%"  height="100%"
+									  >
+								 <s:Button id="btn3_1" width="100%" height="40" label="Emitir Factura" click="btnsProcess(event)"/>
+								 <s:Button id="btn3_2" width="100%" height="40" label="Emitir Recibos" click="btnsProcess(event)"/>
+								 <s:Button id="btn3_3" width="100%" height="40" label="Gráficas" click="btnsProcess(event)"/>
+							</mx:Form>
+							 <mx:Form id="datos" label="DATOS" 
+									  paddingBottom="0" paddingLeft="4" 
+									  paddingRight="4" paddingTop="8" 
+									  width="100%" height="100%"
+									  >
+								 <s:Button id="btn4_1" width="100%" height="40" label="Siglas - Ciudades" click="btnsProcess(event)"/>
+								 <s:Button id="btn4_2" width="100%" height="40" label="Conductores" click="btnsProcess(event)"/>
+								 <s:Button id="btn4_3" width="100%" height="40" label="Vehículos" click="btnsProcess(event)"/>
+								 <s:Button id="btn4_4" width="100%" height="40" label="Empresas" click="btnsProcess(event)"/>
+							 </mx:Form>
+							 <mx:Form id="usuarios" label="USUARIOS"
+									   
+									  paddingBottom="0" paddingLeft="4" 
+									  paddingRight="4" paddingTop="8" 
+									  width="100%" height="100%" 
+									  >
+								 <s:Button id="btn5_1" width="100%" height="40" label="Lista de Usuarios" click="btnsProcess(event)"/>
+								 <s:Button id="btn5_2" width="100%" height="40" label="Editar Usuarios" click="btnsProcess(event)" enabled="{(int(this.currUser.role) >= 20)? true : false}"/>
+							 </mx:Form>
+							 <mx:Form id="claveNoCliente" label="CLAVE"  
+									  paddingBottom="0" paddingLeft="4" 
+									  paddingRight="4" paddingTop="8" 
+									  width="100%"  height="100%"
+									  >
+								 <s:Button id="btn6_1" width="100%" height="40" label="Cambiar Clave" click="btnsProcess(event)"  />					  
+							 </mx:Form>
+							 <mx:Form id="salir" label="SALIR" 
+									  paddingBottom="0" paddingLeft="4" 
+									  paddingRight="4" paddingTop="8" 
+									  width="100%" height="100%">
+							  </mx:Form>
+						 </mx:Accordion>
+		
+					 </s:BorderContainer>
+				 </s:NavigatorContent>
+				 
+				 <s:NavigatorContent id="ncClient" >
+					 <s:BorderContainer width="100%" height="100%" borderStyle="inset">
+						 <s:layout>
+							 <s:VerticalLayout 
+								 
+								 paddingLeft="1" paddingRight="1" 
+								 paddingTop="1" paddingBottom="5"/>
+						 </s:layout>
+<!-- ACORDION DE CLIENTES -->						 
+						 <mx:Accordion  id="acMainMenuClient"
+										 
+										openEasingFunction="{Bounce.easeOut}" 
+										openDuration="1500"
+										width="100%" height="100%"
+										creationComplete="setMenu()"
+										activate="setMenu()"
+										click="acClickHandler(event)"
+										>
+							 <mx:Form id="cliente" label="CLIENTE"  
+									  paddingBottom="0" paddingLeft="4" 
+									  paddingRight="4" paddingTop="8" 
+									  width="100%"  height="100%"
+									  >
+								 <s:Button id="btn7_1" width="100%" height="40" label="Consultar" click="btnsProcess(event)"  />					 
+						<!--	 <s:Button id="btn7_2" width="100%" height="40" label="Agendar" click="btnsProcess(event)"/>	-->					 
+
+								 
+							 </mx:Form>	 
+							 <mx:Form id="claveCliente" label="CLAVE"  
+									  paddingBottom="0" paddingLeft="4" 
+									  paddingRight="4" paddingTop="8" 
+									  width="100%"  height="100%"
+									  >
+								 <s:Button id="btn8_1" width="100%" height="40" label="Cambiar Clave" click="btnsProcess(event)"  />					  
+							 </mx:Form>
+							 
+							 <mx:Form id="salirClient" label="SALIR" 
+									  paddingBottom="0" paddingLeft="4" 
+									  paddingRight="4" paddingTop="8" 
+									  width="100%" height="100%" >
+							 </mx:Form>
+						 </mx:Accordion>
+						 
+					 </s:BorderContainer>
+				 </s:NavigatorContent>
+			</mx:ViewStack>	 
+		 </s:Panel>
+		 
+		 <s:BorderContainer id="rightPanel"  width="80%" height="100%" backgroundColor="#FFFFFF" color="#222222">
+			 
+			 <mx:ViewStack id="vsRight" borderStyle="solid" width="100%" height="100%" color="0x323232" change="vsRight_changeHandler(event)">
+				 <s:NavigatorContent id="ncrMainImage" width="100%" height="100%">
+					 <s:layout>
+						 <s:HorizontalLayout 
+							 paddingLeft="5" paddingRight="5" 
+							 paddingTop="5" paddingBottom="5"/>
+					 </s:layout>
+					 <s:Panel id="panelImagen" width="100%" height="100%" title="{'Usuario: '+currUser.name}">
+						 <mx:VBox verticalAlign="middle" horizontalAlign="center"  width="100%" height="100%" y="0">
+						 	<mx:Image id="imageRight" source="./images/logo.png"  />
+						</mx:VBox>
+					</s:Panel>
+				 </s:NavigatorContent>
+<!-- USERS SOLO LISTA -->				 
+				 <s:NavigatorContent id="ncrUserList" width="100%" height="100%">
+						 <s:layout>
+							 <s:HorizontalLayout 
+								 paddingLeft="5" paddingRight="5" 
+								 paddingTop="5" paddingBottom="5"/>
+						 </s:layout>
+					 	<s:Panel id="panelListUsr" width="100%" height="100%" title="{'Usuario: '+currUser.name}">
+						 <mx:DataGrid id="dgUserList" width="100%" height="100%"
+									  dataProvider="{acUsrsData}">
+							 <mx:columns>				
+								 <mx:DataGridColumn headerText="Nombre" dataField="nombre"/>
+								 <mx:DataGridColumn headerText="Cédula" dataField="cedula"/>
+								 <mx:DataGridColumn headerText="Empresa" dataField="empresaName"/>
+								 <mx:DataGridColumn headerText="Cargo" dataField="cargo"/>
+								 <mx:DataGridColumn headerText="Sede" dataField="sedeLongName"/>
+							</mx:columns>		 
+						 </mx:DataGrid>
+					</s:Panel>
+				 </s:NavigatorContent>
+<!-- USERS LISTA EDICION -->				 
+				 <s:NavigatorContent id="ncrUserListEdit" width="100%" height="100%">
+					 <s:layout>
+						 <s:HorizontalLayout 
+							 paddingLeft="5" paddingRight="5" 
+							 paddingTop="5" paddingBottom="5"/>
+					 </s:layout>
+					 <s:Panel id="panelEditUsr"  width="100%" height="100%" title="{'Usuario: '+currUser.name}">
+						 <s:BorderContainer width="100%" height="100%" borderStyle="inset">
+						 
+						 <mx:DataGrid id="dgUserListEdit" width="100%" height="100%"
+									  dataProvider="{acUsrsData}">
+							 <mx:columns>				
+								 <mx:DataGridColumn headerText="Nombre" dataField="nombre"/>
+								 <mx:DataGridColumn headerText="Cédula" dataField="cedula"/>
+								 <mx:DataGridColumn headerText="Empresa" dataField="empresaName"/>
+								 <mx:DataGridColumn headerText="Cargo" dataField="cargo"/>
+								 <mx:DataGridColumn headerText="Sede" dataField="sedeLongName"/>
+								 <mx:DataGridColumn id="modUsr" itemRenderer="{jaime.com.BTNrendererEdit.getRenderer(this)}" width="60"/>
+								 <mx:DataGridColumn id="delUsr" itemRenderer="{jaime.com.BTNrendererDel.getRenderer(this)}" width="60"/>
+								 <mx:DataGridColumn id="addUsr" itemRenderer="{jaime.com.BTNrendererAdd.getRenderer(this)}" width="60"/>
+							 </mx:columns>		 
+						 </mx:DataGrid>
+					 </s:BorderContainer>
+					<s:controlBarContent>
+						
+					</s:controlBarContent>	 
+					 </s:Panel>
+					 
+				 </s:NavigatorContent>
+
+<!-- CAMBIAR CLAVE -->				 
+				 <s:NavigatorContent id="ncrChangePsw" width="100%" height="100%" >
+					 <s:layout>
+						 <s:HorizontalLayout 
+							 paddingLeft="5" paddingRight="5" 
+							 paddingTop="5" paddingBottom="5"
+							  horizontalAlign="center" verticalAlign="middle"/>
+					 </s:layout>
+					 <s:Panel id="pnelChangePsw"  width="100%" height="100%" title="{'Usuario: '+currUser.name}">
+						 <s:Form x="0" y="0" width="289" height="263" creationComplete="form1_creationCompleteHandler(event)">
+							 <s:FormItem width="100%" label="Nueva Clave:">
+								 <s:TextInput id="tiNewPsw" displayAsPassword="true" change="tiNewPsw_changeHandler(event)"/>
+							 </s:FormItem>
+							 <s:FormItem width="100%" label="Repetir Clave:">
+								 <s:TextInput id="tiRepeatPsw" displayAsPassword="true" change="tiRepeatPsw_changeHandler(event)"/>
+							 </s:FormItem>
+							 <s:FormItem  width="100%" label="Calidad de clave:">
+								 <s:Label id="lbPaswStrenght"/>
+							 </s:FormItem>
+							 <s:FormItem width="100%">
+								 <s:Button label="Cambiar Clave" id="btnCangePsw" enabled="false" click="btnCangePsw_clickHandler(event)"/>
+							 </s:FormItem>
+							 <s:FormItem width="100%" height="51" color="#FF0000" fontWeight="normal">
+								 <s:Label id="lbChaPswMsgSrvs"/>
+							 </s:FormItem>
+						 </s:Form>
+					</s:Panel>
+				 </s:NavigatorContent>	
+<!-- CLIENTES LISTA DE SERVICIOS -->				 
+				 <s:NavigatorContent id="ncrClientListEdit" width="100%" height="100%">
+					 
+						 
+					 	<s:Panel id="panelClientListEdit"  width="100%" height="100%" title="{'Usuario: '+currUser.name}">
+							<s:layout>
+								<s:HorizontalLayout 
+									paddingLeft="5" paddingRight="5" 
+									paddingTop="5" paddingBottom="5"/>
+							</s:layout>
+						<s:BorderContainer width="100%" height="100%" borderStyle="inset">	
+							 <mx:DataGrid id="dgClientListEdit" width="100%" height="100%" variableRowHeight="true"
+										  dataProvider="{acServClientData}">
+								 <mx:columns>				
+									 <mx:DataGridColumn headerText="Empresa" dataField="empresa" width="100"/>
+									 <mx:DataGridColumn headerText="Usuario(s)" dataField="pasajeros" wordWrap="true" width="150"/>
+									 <mx:DataGridColumn headerText="Teléfono(s)" dataField="telfspax"  wordWrap="true" width="100"/>
+									 <mx:DataGridColumn headerText="Fecha de servicio" dataField="fecha" width="80"/>
+									 <mx:DataGridColumn headerText="Hora de Servicio" dataField="hora" width="70"/>
+									 <mx:DataGridColumn headerText="Origen" dataField="origen" width="200"/>
+									 <mx:DataGridColumn headerText="Destino(s)" dataField="destinos" width="200"/>
+									 <mx:DataGridColumn headerText="Conductor" dataField="driver" wordWrap="true" width="100"/>
+									 <mx:DataGridColumn headerText="Tipo de vehículo" dataField="car" width="100"/>
+									 <mx:DataGridColumn id="modSrvCli" itemRenderer="{jaime.com.BTNrendererAdd1.getRenderer(this)}" width="60"/>
+									 <mx:DataGridColumn id="delSrvCli" itemRenderer="{jaime.com.BTNrendererDel1.getRenderer(this)}" width="60"/>
+								 </mx:columns>		 
+							 </mx:DataGrid>
+						</s:BorderContainer>	
+						<s:controlBarContent> 
+							<mx:HBox width="100%" height="100%" verticalGap="7" horizontalAlign="center" verticalAlign="middle">
+								<s:Button id="btnAgendarSrvCli" label="Agendar Nuevo Servicio" width="50%" click="btnAgendarSrvCli_clickHandler(event)"/>
+							</mx:HBox>	
+						<!--	<mx:HBox width="80%" height="100%" verticalGap="7" horizontalAlign="right" verticalAlign="middle">
+								
+								<s:Label text="Lista de Servicios / Cliente Desde:" fontSize="12" fontStyle="normal" fontWeight="bold" color="#101010"/>
+								<mx:DateField id="dfFecDesdeSrvUsr" showToday="true" change="chageDateSrvsUsrHandler(event)"/>
+								<s:Label text=" Hasta:" fontSize="12" fontStyle="normal" fontWeight="bold" color="#101010"/>
+								<mx:DateField id="dfFecHastaSrvUsr" showToday="true" change="chageDateSrvsUsrHandler(event)"/>
+							</mx:HBox>-->
+							
+						</s:controlBarContent>	
+					 </s:Panel>
+				 </s:NavigatorContent>
+			 </mx:ViewStack> 
+
+		 </s:BorderContainer>
+			 
+	
+	 </s:NavigatorContent>
+	</mx:ViewStack>
+	
+	
+	
+	
+	
+</s:Application>

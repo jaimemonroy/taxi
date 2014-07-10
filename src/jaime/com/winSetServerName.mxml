@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- http://blog.flexexamples.com/2009/10/23/displaying-a-popup-spark-titlewindow-container-in-flex-4/ -->
+<s:TitleWindow name="winSetServerName"
+			   xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/halo"
+			   title="Definir nombre de Servidor"
+			   width="206" height="118"
+			   close="ttlWndw_close(event);">
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.events.Event;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			private function btnActClikHand(ev:Event):void
+			{
+				trace("to set server name.."+serverName.text);
+				parentApplication.swflUnif.source = "http://"+serverName.text+"/medidor/unifilar/bin-debug/medidorUnif.swf"
+				parentApplication.setCommUnif(serverName.text);
+				parentApplication.urlIP1 = serverName.text;	
+				//parentApplication.conn.allowDomain("http://"+serverName.text+"/medidor/")
+				PopUpManager.removePopUp(this);
+			}
+			protected function ttlWndw_close(evt:CloseEvent):void 
+			{
+				//PopUpManager.removePopUp(evt.currentTarget as IFlexDisplayObject);
+			}
+
+		]]>
+	</fx:Script>
+	
+	<s:Label x="-3" y="6" text="Servidor / IP:" width="207" textAlign="center" fontWeight="bold"/>
+	<s:Button id="btnAct" x="11" y="53" label="Actualizar" width="184" fontWeight="bold" enabled="true" click="btnActClikHand(event)"/>
+	<s:TextInput id="serverName" x="36" y="22"/>	
+</s:TitleWindow>

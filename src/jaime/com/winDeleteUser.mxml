@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow name="winDeleteUser"
+			   xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"			   
+			   title="Usuario"
+			   width="268" height="182"
+			   close="ttlWndw_close(event);" xmlns:mx2="library://ns.adobe.com/flex/mx">
+	<fx:Script>
+		<![CDATA[
+			import flash.events.Event;
+			import flash.events.TimerEvent;
+			import flash.utils.Timer;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			public var cedula:String=""
+			public var gateway0 : RemotingConnection;
+			public var gateway1 : RemotingConnection;
+			public var numServ:int = 1;
+			public var serv1Name:String=""
+			public var serv2Name:String=""
+			public var servStatus:Object
+			
+			private var web_val:String="F"
+			private var clm_val:String="F"
+			private var bqt_val:String="F"
+			
+			protected function ttlWndw_close(evt:CloseEvent):void {
+				this.lbCualUsuario.text="";
+				this.lbMsgSrvs.text="";
+				PopUpManager.removePopUp(evt.currentTarget as IFlexDisplayObject);
+				
+			}
+			
+			public function setLabelTxt(mensaje:String):void
+			{
+				this.lbCualUsuario.text = mensaje
+			}
+			
+			public function setMsgSrvTxt(messaje:String):void
+			{
+				lbMsgSrvs.text=messaje
+			}
+			public function finalCallBack():void
+			{
+				this.lbCualUsuario.text="";
+				this.lbMsgSrvs.text="";
+				PopUpManager.removePopUp(this);
+			}
+			private function doDelete(ev:Event):void
+			{
+				var auxObj:Array = new Array({name:'status',value:'F'})
+				ev.currentTarget.enabled = false
+				var updateSrv:UpdateServers = new UpdateServers(gateway0,gateway1,
+																"users",
+																auxObj,
+																"cedula",cedula,
+																"",numServ,serv1Name,serv2Name)
+				updateSrv.addEventListener(EventoCustom.EVENT_CUSTOM,onEventCustom)		
+			}
+			private function onEventCustom(ev:EventoCustom):void
+
+			{
+				//trace("proceso: "+ev.target.msgProcess)
+				if(ev.target.msgProcess == "END")
+				{
+					this.lbCualUsuario.text="";
+					this.lbMsgSrvs.text="";
+					parentApplication.refreshAllUsrList()
+					PopUpManager.removePopUp(this);
+				}
+				else
+					lbMsgSrvs.text = ev.target.msgProcess
+			}
+	
+		]]>
+	</fx:Script>
+	<s:Button id="btnDelUsr" x="11" y="81" width="245" label="ELIMINAR" click="doDelete(event)"/>
+	
+	<s:Label id="lbCualUsuario" x="10" y="10" width="246" height="69" fontSize="16" fontWeight="bold"
+			 text="Label" textAlign="center"/>
+	<s:Label id="lbMsgSrvs" x="10" y="110" width="246" height="33" color="#FF0000"
+			 textAlign="center"/>
+	
+</s:TitleWindow>

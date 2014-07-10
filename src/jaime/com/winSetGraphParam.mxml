@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- http://blog.flexexamples.com/2009/10/23/displaying-a-popup-spark-titlewindow-container-in-flex-4/ -->
+<s:TitleWindow name="winSetGraphParam"
+			   xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/halo"
+			   title="Parámetros de Gráfica"
+			   width="244" height="290"
+			   close="ttlWndw_close(event);" xmlns:mx2="library://ns.adobe.com/flex/mx">
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.events.Event;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			[Bindable]
+			public var winBrowseMode:int
+			public var interval:int;
+			public var winFecDesde:Date
+			public var winFecHasta:Date
+			public var graphType:String="";
+			
+			public var gateway : RemotingConnection;
+			private var graphTypeRet:String="";
+			protected function ttlWndw_close(evt:CloseEvent):void {
+				PopUpManager.removePopUp(evt.currentTarget as IFlexDisplayObject);
+				
+			}
+			public function setparams():void
+			{
+				fecDesde.selectedDate=winFecDesde
+				fecHasta.selectedDate=winFecHasta	
+				horaDesde.value= winFecDesde.hours
+				minDesde.value= winFecDesde.minutes
+				horaHasta.value= winFecHasta.hours
+				minHasta.value= winFecHasta.minutes
+				modo.selection = ( winBrowseMode == 1 )? rbPan : rbZoom
+				slIntervalo.value = interval
+				if 	(graphType == "ncPieChartDoors")
+				{
+					slIntervalo.enabled = false
+					rbZoom.enabled = false
+					horaDesde.enabled = false
+					horaHasta.enabled = false
+					horaHasta.enabled = false
+					horaHasta.enabled = false	
+					modo.selection = rbPan	
+				}
+				else
+				{
+					slIntervalo.enabled = true
+					rbZoom.enabled = true
+					horaDesde.enabled = true
+					horaHasta.enabled = true
+					horaHasta.enabled = true
+					horaHasta.enabled = true	
+				}	
+				trace("winSetParams recibe: "+graphType)
+				switch(graphType)
+				{
+					case "ncPieChartDoors":
+						graphTypeRet = "doorPie"
+					break
+					case "ncPieChartEnergy":
+						graphTypeRet = "enPie"
+					break
+					case "ncMultiGraficasBarra":
+						graphTypeRet = "mBar"
+					break
+					case "ncGraficasBarra":
+						graphTypeRet = "Bar"
+					break;
+					case "ncGraficasLinea":
+						graphTypeRet = "lin"
+					break;
+				}
+				
+			}
+			private function handChangeFec(ev:Event):void
+			{
+				var temp1Fec:Date = new Date(fecDesde.selectedDate.fullYear,fecDesde.selectedDate.month+1,fecDesde.selectedDate.date,horaDesde.value,minDesde.value,0)
+				var temp2Fec:Date = new Date(fecHasta.selectedDate.fullYear,fecHasta.selectedDate.month+1,fecHasta.selectedDate.date,horaHasta.value,minHasta.value,0)
+					if((temp2Fec.time-temp1Fec.time) < 60000)
+						btnGrapicar.enabled = false
+					else
+						btnGrapicar.enabled = true
+				trace("Elemento: "+ev.currentTarget.name+" cambio, date diff: "+(temp2Fec.time-temp1Fec.time))
+			}
+			private function handClickGraph(ev:Event):void
+			{
+				var temp1Fec:Date = new Date(fecDesde.selectedDate.fullYear,fecDesde.selectedDate.month,fecDesde.selectedDate.date,horaDesde.value,minDesde.value,0)
+				var temp2Fec:Date = new Date(fecHasta.selectedDate.fullYear,fecHasta.selectedDate.month,fecHasta.selectedDate.date,horaHasta.value,minHasta.value,0)
+				var mode:int = (modo.selection == rbPan)?  1 : 2;	
+					//var target:DisplayObject = padre.parent.getChildByName("actual");
+					//padre.parent.removeChild(target)
+				trace("padre: "+this.parent.name+" le envio tipo: "+graphTypeRet)
+				parentApplication.winUpdateGraph(temp1Fec,temp2Fec,mode,slIntervalo.value,graphTypeRet);
+				PopUpManager.removePopUp(this);
+
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:RadioButtonGroup id="modos"/>
+		<s:RadioButtonGroup id="modo"/>
+	</fx:Declarations>
+	
+	<s:Label x="14" y="15" text="Desde:" width="63" textAlign="right" fontWeight="bold"/>
+	<s:Label x="157" y="36" text=":" width="27" textAlign="center" fontWeight="bold"/>
+	<s:NumericStepper x="114" y="31" width="45" id="horaDesde" value="23" maximum="23" change="{handChangeFec(event)}"/>
+	<s:NumericStepper x="184" y="31" width="45" id="minDesde" value="59" maximum="59" change="{handChangeFec(event)}"/>
+	<s:Label x="14" y="66" text="Hasta:" width="63" textAlign="right" fontWeight="bold"/>
+	<s:Label x="157" y="87" text=":" width="27" textAlign="center" fontWeight="bold"/>
+	<s:NumericStepper x="114" y="82" width="45" id="horaHasta" value="23" maximum="23" change="{handChangeFec(event)}"/>
+	<s:NumericStepper x="184" y="82" width="45" id="minHasta" value="59" maximum="59" change="{handChangeFec(event)}"/>
+	<mx2:DateField  x="10" y="31" id="fecDesde" change="{handChangeFec(event)}"/>
+	<mx2:DateField x="10" y="82" id="fecHasta" change="{handChangeFec(event)}"/>
+	<s:Button x="64" y="222" label="Graficar" width="117" id="btnGrapicar" click="handClickGraph(event)"/>
+	<s:BorderContainer x="10" y="116" width="222" height="93">
+		<s:Label x="-1" y="10" text="Modo de Navegación" width="219" textAlign="center" fontWeight="bold" fontSize="13"/>
+		<s:HSlider x="17" y="76" width="184" id="slIntervalo" minimum="1" maximum="24" stepSize="1" value="24"/>
+		<s:Label x="-1" y="60" text="Intervalo" textAlign="center" fontWeight="bold" width="218"/>
+		<s:RadioButton id="rbPan" x="46" y="34" label="PAN" groupName="modo"/>
+		<s:RadioButton id="rbZoom" x="114" y="33" label="ZOOM" groupName="modo"/>
+	</s:BorderContainer>
+	
+	
+	
+</s:TitleWindow>

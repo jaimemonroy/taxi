@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow name="winCreateSite"
+			   xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:components="com.hillelcoren.components.*"
+			   title="Nuevo Sitio"
+			   width="416" height="178"
+			   close="ttlWndw_close(event);" xmlns:mx2="library://ns.adobe.com/flex/mx">
+	<fx:Script>
+		<![CDATA[
+			import flash.events.Event;
+			import flash.events.TimerEvent;
+			import flash.utils.Timer;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.utils.ObjectProxy;
+			
+			public var cedula:String=""
+			public var userSec:String=""
+			public var gateway0 : RemotingConnection;
+			public var gateway1 : RemotingConnection;
+			
+			[Bindable]	
+			private var acCiudades:ArrayCollection
+			
+			public var numServ:int = 1;
+			public var serv1Name:String=""
+			public var serv2Name:String=""
+			
+			private var web_val:String="F"
+			private var clm_val:String="F"
+			private var bqt_val:String="F"
+
+			protected function ttlWndw_close(evt:CloseEvent):void 
+			{
+				this.lbMsgSrvs.text="";
+				PopUpManager.removePopUp(evt.currentTarget as IFlexDisplayObject);
+				
+			}
+			public function setupWinCreateSite():void
+			{
+				ticity.enabled=false
+				btnNewSite.enabled=false;
+				this.tidireccion.enabled=false
+				gateway0.call( "universalDBUpd.getAllCities" , new Responder(onResultCitiesList, onFaultCitiesList))
+			}
+			private function onResultCitiesList(result:Array):void
+			{
+				for(var s:String in result) result[s] = new ObjectProxy(result[s]);
+				acCiudades = new ArrayCollection (result);
+				trace("numero de ciudades: "+acCiudades.length)
+				ticity.enabled=true
+			}
+			
+			private function changeAcCtiesHandler(ev:Event):void
+			{
+				if(ev.currentTarget.selectedItem == null)
+				{
+					sigla.text = ""
+					this.tidireccion.enabled=false
+				}
+				else
+				{
+					sigla.text = ev.currentTarget.selectedItem.sigla
+					this.tidireccion.enabled=true
+				}
+			}
+			public function setMsgSrvTxt(messaje:String):void
+			{
+				lbMsgSrvs.text=messaje
+			}
+			public function finalCallBack():void
+			{
+	
+				this.lbMsgSrvs.text="";
+				PopUpManager.removePopUp(this);
+			}
+			private function doCreate(ev:Event):void
+			{
+				var auxObj:Array = new Array({name:'status',value:'F'})
+				ev.currentTarget.enabled = false
+				var updateSrv:UpdateServers = new UpdateServers(gateway0,gateway1,
+																"users",
+																auxObj,
+																"cedula",cedula,
+																"",numServ,serv1Name,serv2Name)
+				updateSrv.addEventListener(EventoCustom.EVENT_CUSTOM,onEventCustom)		
+			}
+			private function onEventCustom(ev:EventoCustom):void
+			{
+				//trace("proceso: "+ev.target.msgProcess)
+				if(ev.target.msgProcess == "ENDsitios")
+				{
+					
+					this.lbMsgSrvs.text="";
+					this.dispatchEvent(new EventoCustom(EventoCustom.EVENT_CLOSE_WIN,false,false));
+					PopUpManager.removePopUp(this);
+					
+				}
+				else
+					lbMsgSrvs.text = ev.target.msgProcess
+			}
+			protected function manageBtnTts(ev:Event):void
+			{
+				if(ev.currentTarget.text.length>=4)
+					this.btnNewSite.enabled=true
+				else
+					this.btnNewSite.enabled=false
+			}
+			
+			protected function btnNewSite_clickHandler(event:MouseEvent):void
+			{
+				// TODO Auto-generated method stub
+				//get next site id with userSec:
+				trace("Calling getNextId_Table with sec:"+userSec)
+				gateway0.call("universalDBUpd.getNextId_Table",new Responder(onResultNextId, onFaultNextId),userSec,"sitios")
+			}
+			
+			//
+			private function onResultNextId(result:String):void
+			{
+				//now lets prepare te insert string 
+				var strInsertValues:String ="'"+result+"',"
+				strInsertValues +="'"+sigla.text+" "+tidireccion.text.toUpperCase()+"'"
+				var insertSrv:InsertServers = new InsertServers(gateway0,gateway1,
+																"sitios",strInsertValues,
+																"CREADO NUEVO SITIO",
+																this.numServ,this.serv1Name,this.serv2Name)
+				insertSrv.addEventListener(EventoCustom.EVENT_CUSTOM,onEventCustom)	                                            
+					
+			}
+			private function onFaultCitiesList(fault:String):void
+			{
+				trace("AMFPHP winCreteCities list: Fail on get all cities: "+fault)
+			}
+			private function onFaultNextId(fault:String):void
+			{
+				trace("AMFPHP winCreteCities list: Fail on next ID city: "+fault)
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Define the data model. -->
+		
+		<!-- Define the validators. -->
+		
+	</fx:Declarations>
+	<s:VGroup width="100%" height="145">
+		<s:Form x="0" y="0" width="100%" height="90%">
+			<s:HGroup width="100%" >
+				<s:Label width="15%" fontWeight="bold" paddingTop="5"
+						 text="Ciudad:" textAlign="right"/>
+				<components:AutoComplete  id="ticity" width="70%"
+										  toolTip="Escriba las primeras letras de la ciudad"  
+										  dataProvider="{acCiudades}" labelField="full_city" change="changeAcCtiesHandler(event)" />
+				<s:Label id="sigla" width="15%" fontWeight="bold" paddingTop="5" fontStyle="italic"
+						  textAlign="center"/>
+			</s:HGroup>
+			<s:HGroup width="100%" >
+				<s:Label width="15%" fontWeight="bold" paddingTop="5"
+						 text="Dirección:" textAlign="right"/>
+				<s:TextInput id="tidireccion" width="85%" height="100%" paddingTop="5" textAlign="left" change="manageBtnTts(event)"/>
+			</s:HGroup>	
+			<s:HGroup width="100%" horizontalAlign="center" verticalAlign="middle">
+				<s:Button id="btnNewSite" width="50%" label="new" click="btnNewSite_clickHandler(event)"/>
+			</s:HGroup>
+			<s:HGroup width="100%" horizontalAlign="center" verticalAlign="middle">
+				<s:Label id="lbMsgSrvs" y="3" width="100%" height="41" color="#FF0000"
+						 textAlign="center"/>
+			</s:HGroup>
+		</s:Form>
+	</s:VGroup>
+	
+	
+	
+</s:TitleWindow>

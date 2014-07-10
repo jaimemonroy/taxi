@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow name="winCreatePax"
+			   xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:components="com.hillelcoren.components.*"
+			   title="Nuevo Pasajero"
+			   width="416" height="150"
+			   close="ttlWndw_close(event);" xmlns:mx2="library://ns.adobe.com/flex/mx">
+	<fx:Script>
+		<![CDATA[
+			import flash.events.Event;
+			import flash.events.TimerEvent;
+			import flash.utils.Timer;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.utils.ObjectProxy;
+			
+			public var cedula:String=""
+			public var userSec:String=""
+			public var cliente:String
+			public var gateway0 : RemotingConnection;
+			public var gateway1 : RemotingConnection;
+			
+			[Bindable]	
+			private var acCiudades:ArrayCollection
+			
+			public var numServ:int = 1;
+			public var serv1Name:String=""
+			public var serv2Name:String=""
+			
+			private var web_val:String="F"
+			private var clm_val:String="F"
+			private var bqt_val:String="F"
+
+			protected function ttlWndw_close(evt:CloseEvent):void 
+			{
+				this.lbMsgSrvs.text="";
+				PopUpManager.removePopUp(evt.currentTarget as IFlexDisplayObject);
+				
+			}
+
+			public function setMsgSrvTxt(messaje:String):void
+			{
+				lbMsgSrvs.text=messaje
+			}
+			public function finalCallBack():void
+			{
+	
+				this.lbMsgSrvs.text="";
+				PopUpManager.removePopUp(this);
+			}
+			
+			private function onEventCustom(ev:EventoCustom):void
+			{
+				//trace("proceso: "+ev.target.msgProcess)
+				if(ev.target.msgProcess == "ENDpax")
+				{
+					
+					this.lbMsgSrvs.text="";
+					this.dispatchEvent(new EventoCustom(EventoCustom.EVENT_CLOSE_WIN,false,false));
+					PopUpManager.removePopUp(this);
+					
+				}
+				else
+					lbMsgSrvs.text = ev.target.msgProcess
+			}
+			protected function manageBtnTts(ev:Event):void
+			{
+				if(this.tiNombre.text != "")
+					this.btnNewPax.enabled=true
+				else
+					this.btnNewPax.enabled=false
+			}
+			
+			protected function btnNewPax_clickHandler(event:MouseEvent):void
+			{
+				// TODO Auto-generated method stub
+				//get next site id with userSec:
+				trace("Calling getNextId_Table with sec:"+userSec)
+				gateway0.call("universalDBUpd.getNextId_Table",new Responder(onResultNextId, onFaultNextId),userSec,"pax")
+			}
+			
+			//
+			private function onResultNextId(result:String):void
+			{
+				//now lets prepare te insert string 
+				var strInsertValues:String ="'"+result+"',"		//id_pax
+				strInsertValues += "'"+cliente+"',"				//id_client
+				strInsertValues += "'"+this.tiNombre.text.toUpperCase()+"',";		//pax_name
+				strInsertValues += "'"+this.tiTelefono.text+"'"		//cel_phone
+				var insertSrv:InsertServers = new InsertServers(gateway0,gateway1,
+																"pax",strInsertValues,
+																"CREADO NUEVO PASAJERO",
+																this.numServ,this.serv1Name,this.serv2Name)
+				insertSrv.addEventListener(EventoCustom.EVENT_CUSTOM,onEventCustom)	                                            
+					
+			}
+			private function onFaultCitiesList(fault:String):void
+			{
+				trace("AMFPHP winCreteCities list: Fail on get all cities: "+fault)
+			}
+			private function onFaultNextId(fault:String):void
+			{
+				trace("AMFPHP winCreteCities list: Fail on next ID city: "+fault)
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Define the data model. -->
+		
+		<!-- Define the validators. -->
+		
+	</fx:Declarations>
+	<s:VGroup width="100%" height="116">
+		<s:Form x="0" y="0" width="100%" height="90%">
+			<s:HGroup width="100%" >
+				<s:Label width="15%" fontWeight="bold" paddingTop="5"
+						 text="Nombre:" textAlign="right"/>
+				<s:TextInput id="tiNombre" width="85%" height="100%" paddingTop="5" textAlign="left" change="manageBtnTts(event)"/>
+			</s:HGroup>	
+			<s:HGroup width="100%" >
+				<s:Label width="15%" fontWeight="bold" paddingTop="5"
+						 text="Telefono:" textAlign="right"/>
+				<s:TextInput id="tiTelefono" width="85%" height="100%" paddingTop="5" textAlign="left" change="manageBtnTts(event)"/>
+			</s:HGroup>
+			<s:HGroup width="100%" horizontalAlign="center" verticalAlign="middle">
+				<s:Button id="btnNewPax" width="50%" label="new" click="btnNewPax_clickHandler(event)" enabled="false"/>
+			</s:HGroup>
+			<s:HGroup width="100%" horizontalAlign="center" verticalAlign="middle">
+				<s:Label id="lbMsgSrvs" y="3" width="100%" height="41" color="#FF0000"
+						 textAlign="center"/>
+			</s:HGroup>
+		</s:Form>
+	</s:VGroup>
+	
+	
+	
+</s:TitleWindow>

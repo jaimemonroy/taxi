@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- http://blog.flexexamples.com/2009/10/23/displaying-a-popup-spark-titlewindow-container-in-flex-4/ -->
+<s:TitleWindow name="winNewConPrg"
+			   xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/halo"
+			   title="Seleccionar Eventos"
+			   width="410" height="332"
+			   creationComplete="{initWin()}"
+			   close="ttlWndw_close(event);" xmlns:mx2="library://ns.adobe.com/flex/mx">
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.events.Event;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			[Bindable]
+			public var acSoeObs:ArrayCollection
+			
+			public var gateway : RemotingConnection;
+
+			public var dfecD:Date;
+			public var dfecH:Date;
+
+			
+			protected function ttlWndw_close(evt:CloseEvent):void {
+				PopUpManager.removePopUp(evt.currentTarget as IFlexDisplayObject);
+				
+			}
+			public function setsoeNames():void
+			{
+				for (var i:int = 0; i<acSoeObs.length; i++)
+				{
+					this["cbSoe"+(i+1)].label = acSoeObs.getItemAt(i).soe_obj_titulo;
+					this["cbSoe"+(i+1)].selected = acSoeObs.getItemAt(i).selected;
+				}	
+				dfFecSoeDesde.selectedDate = dfecD
+				dfFecSoeHasta.selectedDate = dfecH
+				horaSoeDesde.value = dfecD.hours 	
+				minSoeDesde.value =	dfecD.minutes
+				segSoeDesde.value = dfecD.seconds	
+				horaSoeHasta.value = dfecH.hours 	
+				minSoeHasta.value =	dfecH.minutes
+				segSoeHasta.value = dfecH.seconds	
+			}
+			private function initWin():void
+			{
+				dfFecSoeDesde.selectedDate = dfecD
+				dfFecSoeHasta.selectedDate = dfecH	
+			}
+			
+			private function handCBchange(ev:Event):void
+			{
+				var algunCB:Boolean=false
+				for(var i:int=0;i<acSoeObs.length; i++)
+					if( this["cbSoe"+(i+1)].selected )
+						algunCB=true
+				if(algunCB)
+					btnBuscarSoe.enabled = true;
+				else 
+					btnBuscarSoe.enabled = false;
+			}
+
+			private function btnActClikHand(ev:Event):void
+			{
+				var temp:Array= new Array;
+				var aux:int = 0
+				var auxDate:Date = new Date;
+				var timeDesde:int
+				var timeHasta:int
+				for(var i:int=0;i<acSoeObs.length; i++)
+				{
+					if( this["cbSoe"+(i+1)].selected )
+						temp[i] = acSoeObs.getItemAt(i).soe_obj_num;
+					else
+						temp[i] = 0;
+				}
+				auxDate = dfFecSoeDesde.selectedDate
+				auxDate.hours = horaSoeDesde.value
+				auxDate.minutes = minSoeDesde.value
+				auxDate.seconds = segSoeDesde.value	
+				timeDesde = auxDate.time/1000
+				auxDate = dfFecSoeHasta.selectedDate
+				auxDate.hours = horaSoeHasta.value
+				auxDate.minutes = minSoeHasta.value
+				auxDate.seconds = segSoeHasta.value	
+				timeHasta = auxDate.time/1000
+				trace ("le paso a mi papa los soe: "+temp)
+				parentApplication.updateSoes(timeDesde,	timeHasta, temp);
+				
+				PopUpManager.removePopUp(this);
+				//gw.call("controles.insertPrgKon",doPrgCtrl,this.Name,this.kon_num,0,comment,lun,mar,mie,jue,vie,sab,dom,stOpen,stClose)	
+			//	gateway.call( "controles.insertPrgKon", new Responder(onInserCntrlPrg, onFault),name,konNum,0,comment.text,
+																	//	mo,tu,we,th,fr,sa,su,stOpen,stClose);	
+			}
+
+			private function onFault( fault : String ) : void
+			{
+				trace( "Falla"+fault );
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Label x="10" y="12" text="Objetos:" width="388" fontWeight="bold" fontSize="14" textAlign="center"/>
+	<s:Label x="10" y="192" text="Desde:" width="171" textAlign="center" fontWeight="bold"/>
+	<s:Label x="55" y="241" text=":" width="17" textAlign="center" fontWeight="bold"/>
+	<s:NumericStepper x="10" y="236" width="45" id="horaSoeDesde" value="0" maximum="23"/>
+	<s:NumericStepper x="75" y="236" width="45" id="minSoeDesde" value="0" maximum="59"/>
+	<s:NumericStepper x="140" y="236" width="45" id="segSoeDesde" value="0" maximum="59"/>
+	<s:Label x="223" y="192" text="Hasta:" width="170" textAlign="center" fontWeight="bold"/>
+	<s:Label x="268" y="241" text=":" width="17" textAlign="center" fontWeight="bold"/>
+	<s:NumericStepper x="223" y="236" width="45" id="horaSoeHasta" value="23" maximum="23"/>
+	<s:NumericStepper x="288" y="236" width="45" id="minSoeHasta" value="59" maximum="59"/>
+	<s:NumericStepper x="353" y="235" width="45" id="segSoeHasta" value="59" maximum="59"/>
+	<s:Label x="121" y="241" text=":" width="17" textAlign="center" fontWeight="bold"/>
+	<s:Label x="334" y="241" text=":" width="17" textAlign="center" fontWeight="bold"/>
+	<s:Button id="btnBuscarSoe" x="100" y="270" label="Buscar" width="210" fontWeight="bold" click="btnActClikHand(event)"/>
+	<mx2:DateField x="10" y="205" width="171" id="dfFecSoeDesde"/>
+	<mx2:DateField x="223" y="205" width="170" id="dfFecSoeHasta"/>
+	<s:CheckBox x="11" y="29" id="cbSoe1" width="387" fontWeight="bold" change="handCBchange(event)"/>
+	<s:CheckBox x="11" y="54" id="cbSoe2" width="387" fontWeight="bold" change="handCBchange(event)"/>
+	<s:CheckBox x="11" y="80" id="cbSoe3" width="387" fontWeight="bold" change="handCBchange(event)"/>
+	<s:CheckBox x="11" y="105" id="cbSoe4" width="387" fontWeight="bold" change="handCBchange(event)"/>
+	<s:CheckBox x="11" y="133" id="cbSoe5" width="387" fontWeight="bold" change="handCBchange(event)"/>
+	<s:CheckBox x="11" y="160" id="cbSoe6" width="387" fontWeight="bold" change="handCBchange(event)"/>
+	
+	
+	
+</s:TitleWindow>

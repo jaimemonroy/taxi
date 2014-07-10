@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<!-- itemRenderers\sparkmx\myComponents\BTNeditor.mxml -->
+<s:MXDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						  xmlns:s="library://ns.adobe.com/flex/spark" 
+						  xmlns:mx="library://ns.adobe.com/flex/mx">
+	
+	<fx:Script>
+		<![CDATA[
+			public var parentView:Object;
+			
+			public static function getRenderer(view:Object):ClassFactory{
+				var editDeleteRenderer:ClassFactory = new ClassFactory(BTNrendererDel);
+				editDeleteRenderer.properties = { parentView:view  };
+				return editDeleteRenderer;
+			}
+			private function clickHandler():void
+			{
+				parentView.callDelUsr(data.cedula)
+			}
+		]]>
+	</fx:Script>
+	<mx:HBox  width="100%" paddingLeft="5" paddingRight="5" >
+	<s:Button id="myBtn"
+			   width="100%"
+			    icon="@Embed('images/iconDel.png')"
+			   enabled = "{(data.incluir == 'f')? false : true}"
+			    toolTip="{'Eliminar Usuario: '+data.nombre}"
+			   click="clickHandler();" skinClass="skinButtonDel"/>
+	</mx:HBox>	
+	<!-- enabled="{data.unifBool}" -->
+</s:MXDataGridItemRenderer>

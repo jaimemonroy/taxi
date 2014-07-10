@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!-- itemRenderers\sparkmx\myComponents\BTNeditor.mxml -->
+<s:MXDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						  xmlns:s="library://ns.adobe.com/flex/spark" 
+						  xmlns:mx="library://ns.adobe.com/flex/mx">
+	
+	<fx:Script>
+		<![CDATA[
+			public var parentView:Object;
+			
+			public static function getEditDeleteRenderer(view:Object):ClassFactory{
+				var editDeleteRenderer:ClassFactory = new ClassFactory(BTNeditor);
+				editDeleteRenderer.properties = { parentView:view  };
+				return editDeleteRenderer;
+			}
+			private function clickHandler():void
+			{
+				//myRetVal=ev.currentTarget.selected;
+				//data.incBool = ev.currentTarget.selected;
+				trace("un click cambio: "+data.indice)
+			}
+		]]>
+	</fx:Script>
+	<mx:HBox paddingLeft="5">
+	<s:Button id="myBtn"
+			   enabled="{data.unifBool}"
+			   label="{data.unifilar}"
+			   click="clickHandler();"/>
+	</mx:HBox>	
+</s:MXDataGridItemRenderer>

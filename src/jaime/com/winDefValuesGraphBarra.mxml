@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- http://blog.flexexamples.com/2009/10/23/displaying-a-popup-spark-titlewindow-container-in-flex-4/ -->
+<s:TitleWindow name="winDefValuesGraphBarra"
+			   xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"			   
+			   title="Definir Valores de Grafica de Barra"
+			   width="268" height="234"
+			   creationComplete="clearGraph()"
+			   close="ttlWndw_close(event);" xmlns:mx2="library://ns.adobe.com/flex/mx">
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.events.Event;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			private var dpEmpty:ArrayCollection
+			[Bindable]
+			public var dpByTypeAnas:ArrayCollection
+			
+			public var gateway : RemotingConnection;
+			
+			protected function ttlWndw_close(evt:CloseEvent):void {
+				PopUpManager.removePopUp(evt.currentTarget as IFlexDisplayObject);
+				
+			}
+			private function clearGraph():void
+			{
+			/*	try
+				{
+				parentApplication.dpData15min = new ArrayCollection();
+				}
+				catch(errObject:Error) {
+					trace(errObject.message);
+				}*/
+		
+			}
+			private function setBtnEnable(ev:Event):void
+			{
+				if(ev.currentTarget.selectedIndices.length > 0 &&  ev.currentTarget.selectedIndices.length < 5)
+					btnAct.enabled = true
+				else
+					btnAct.enabled = false
+			}
+			private function btnActClikHand(ev:Event):void
+			{
+				var arrTemp:Array = new Array
+				for (var i:int =0; i<dgValues.selectedIndices.length; i++)
+				{
+					arrTemp[i] = dgValues.selectedIndices[i]
+					//parentApplication.arrAnlsGraphBarra[i] = dgValues.selectedIndices[i]
+				}
+				parentApplication.multiColumnchart1.visible = true;
+				parentApplication.legendMultiBar.visible = true;
+				parentApplication.arrAnlsGraphBarra = arrTemp.reverse()
+				parentApplication.fecDesdeMultiGraphBarra.enabled = true
+				parentApplication.horaDesdeMultiGraphBarra.enabled = true
+				parentApplication.minutoDesdeMultiGraphBarra.enabled = true	
+				parentApplication.fecHastaMultiGraphBarra.enabled = true	
+				parentApplication.horaHastaMultiGraphBarra.enabled = true
+				parentApplication.minutoHastaMultiGraphBarra.enabled = true
+				parentApplication.btnActMultiGraphBarra.enabled = true
+				parentApplication.initSeries()
+				PopUpManager.removePopUp(this);
+			}
+
+			private function onFault( fault : String ) : void
+			{
+				trace( "Falla"+fault );
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Label x="14" y="10" text="Valor(es) (max. 4):" width="242" textAlign="center" fontWeight="bold"/>
+	<s:Button id="btnAct" x="12" y="170" label="Actualizar" width="246" fontWeight="bold" enabled="false" click="btnActClikHand(event)"/>
+	<mx:DataGrid sortableColumns="false" id="dgValues" allowMultipleSelection="true" x="10" y="26" width="246" height="136" dataProvider="{dpByTypeAnas}" change="setBtnEnable(event)">
+		<mx:columns>
+			<mx:DataGridColumn headerText="Valor" width="180" dataField="anaFullName"/>
+			<!-- <mx:DataGridColumn headerText="Color" dataField="kolor" itemRenderer="jaime.com.redererColorPick" /> 
+			<mx:DataGridColumn id="ColorColumn" headerText="Color" sortable="false" editable="true" rendererIsEditor="true" editorDataField="value" >
+				<mx:itemRenderer>
+					<fx:Component>
+						<mx:HBox horizontalAlign="center" horizontalScrollPolicy="off" verticalScrollPolicy="off" >
+							<fx:Script>
+								<![CDATA[
+								public function get value():String
+								{
+								return String( data.Color );
+								}
+								override public function set data(value:Object):void
+								{
+								super.data = value;
+								ColorColumnColorPicker.selectedColor = data.Color;
+								}
+								]]>
+							</fx:Script>
+							<mx:ColorPicker id="ColorColumnColorPicker" valueCommit="{ data.Color = String(ColorColumnColorPicker.selectedColor);}" />
+						</mx:HBox>
+					</fx:Component>
+				</mx:itemRenderer>
+			</mx:DataGridColumn> -->
+		</mx:columns>	
+	</mx:DataGrid>	
+</s:TitleWindow>

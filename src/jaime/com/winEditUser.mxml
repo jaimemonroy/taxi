@@ -1,0 +1,413 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow name="winEditUser"
+			   xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"			   
+			   title="Usuario"
+			   width="568" height="222"
+			   
+			   close="ttlWndw_close(event);" xmlns:mx2="library://ns.adobe.com/flex/mx">
+	<fx:Script>
+		<![CDATA[
+			import flash.events.Event;
+			import flash.events.TimerEvent;
+			import flash.utils.Timer;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.events.ValidationResultEvent;
+			import mx.managers.PopUpManager;
+			
+			import spark.collections.*;
+			
+			
+			public var cedula:String=""
+			public var usrId:int = -1	
+			public var acDataAllUsrs:ArrayCollection
+			public var acDataClientId:ArrayCollection
+			public var acDataCities:ArrayCollection
+			public var acNiveles:ArrayCollection 
+			
+			
+			public var gateway0 : RemotingConnection;
+			public var gateway1 : RemotingConnection;
+			public var numServ:int = 1;
+			public var serv1Name:String=""
+			public var serv2Name:String=""
+			public var servStatus:Object
+			
+			private var vResult:ValidationResultEvent;
+			
+			private var isEdit:Boolean; 
+			private var web_val:String="F"
+			private var clm_val:String="F"
+			private var bqt_val:String="F"
+			private var nextSec:String=""
+			private var Query:String=""
+			private var defaultPassword:String ="f4432d87ec6743789131ca85f58fe89c"
+			
+			protected function ttlWndw_close(evt:CloseEvent):void {
+				
+				this.lbMsgSrvs.text="";
+				PopUpManager.removePopUp(evt.currentTarget as IFlexDisplayObject);
+				
+			}
+			
+			public function setNewEdit(que:Boolean):void
+			{
+				isEdit=que;
+				if(isEdit)
+				{
+					Query = "UPDATE users SET "
+					btnValEx.label = "Modificar"
+					tiNombre.text = acDataAllUsrs.getItemAt(usrId).nombre
+					tiCedula.text = acDataAllUsrs.getItemAt(usrId).cedula
+					lbSec.text = "Sec: "+acDataAllUsrs.getItemAt(usrId).sec
+					cbPassword.enabled=true
+					cbPassword.selected=false
+					cbSede.enabled=false
+						
+				}
+				else	//New User
+				{
+					Query = "INSERT INTO users VALUES("
+					btnValEx.label = "Nuevo"
+					tiNombre.text = "";
+					tiCedula.text = "";
+					cbPassword.selected=true
+					cbPassword.enabled=false
+					cbSede.enabled=true	
+					//get max seq from a call to DB:
+					
+				}
+				btnValEx.enabled=false;	
+				tiSalario.text = acDataAllUsrs.getItemAt(usrId).salario
+					
+				cbEmpresa.dataProvider=acDataClientId
+				cbEmpresa.labelField="nombre_corto"
+				cbEmpresa.selectedIndex = getIdxacEmpresas(acDataAllUsrs.getItemAt(usrId).empresa)
+					
+				cbNivel.dataProvider=acNiveles
+				cbNivel.labelField="id_role"	
+				//cbNivel.selectedIndex = findIndex(this.acNiveles,"label",acDataAllUsrs.getItemAt(usrId).nivel)	
+				cbNivel.selectedIndex = getIdxacNiveles(acDataAllUsrs.getItemAt(usrId).nivel)
+				lbCargo.text = 	 acNiveles.getItemAt(cbNivel.selectedIndex).role
+				
+				/*for (var i:int=0; i<acDataCities.length;i++)
+				{
+					trace ("ciudad: "+acDataCities.getItemAt(i).sigla+" : "+acDataCities.getItemAt(i).ciudad)
+				}*/
+				cbSede.dataProvider = 	acDataCities
+				cbSede.labelField = "ciudad";
+				
+				cbSede.selectedIndex = 	getCityidx(acDataAllUsrs.getItemAt(usrId).sede);
+				trace("city: "+acDataAllUsrs.getItemAt(usrId).sede+" idx: "+getCityidx(acDataAllUsrs.getItemAt(usrId).sede))
+				lbSedeLongName.text = acDataCities.getItemAt(cbSede.selectedIndex).sigla
+				if(!isEdit)
+				{
+					nextSec = acDataCities.getItemAt(cbSede.selectedIndex).sigla+getMaxSEC(acDataAllUsrs.getItemAt(usrId).sede)
+					lbSec.text = "Sec: "+nextSec
+				}
+					
+			}
+			
+			private function getCityidx(_sede:String):int
+			{
+				var i:int = 0
+				var rex:RegExp = /[\s\r\n]+/gim;
+				for(i=0;i<acDataCities.length;i++)
+				{
+					//trace("i: "+i+", Sigla:"+acDataCities.getItemAt(i).sigla+"**")	
+					//trace("i: "+i+", _sede:"+_sede+"**")
+					if(_sede == acDataCities.getItemAt(i).sigla.replace(rex,'') )
+						break
+				}
+				return i;
+			}
+			
+			private function cbNivelChangeHandler(ev:Event):void
+			{
+				
+				trace("nivel index: "+ev.currentTarget.selectedIndex)
+				btnValEx.enabled=true
+				lbCargo.text = acNiveles.getItemAt(ev.currentTarget.selectedIndex).role
+			}
+			
+			
+			private function cbCityChangeHandler(ev:Event):void
+			{
+				btnValEx.enabled=true
+				lbSedeLongName.text = acDataCities.getItemAt(ev.currentTarget.selectedIndex).sigla
+				if(!isEdit)
+				{
+					nextSec = acDataCities.getItemAt(cbSede.selectedIndex).sigla+getMaxSEC(acDataCities.getItemAt(cbSede.selectedIndex).sigla)
+					lbSec.text = "Sec: "+nextSec
+				}
+			}
+			
+			private function cbNivelKeysHandler(ev:Event):void
+			{
+				
+				
+				trace("keys: "+ev.target.text+"......"+getIdxacNiveles(ev.target.text))
+				lbCargo.text = acNiveles.getItemAt(getIdxacNiveles(ev.target.text)).role
+			}
+			
+			private function cbCityKeysHandler(ev:Event):void
+			{
+				lbSedeLongName.text =acDataCities.getItemAt(getIdxacCities(ev.target.text)).sigla
+			}
+			
+			private function changeAlltiHandler(ev:Event):void
+			{
+				
+				btnValEx.enabled=true
+			}
+			
+			private function findIndex(dp:ArrayCollection, prop:String, what:String ):int 
+			{
+				for(var k:int=0; k<dp.length; k++) {
+					if(String(dp.getItemAt(k)[prop])==what) return k;
+				}
+				return -1;
+			}
+			private function getIdxacNiveles(nivel:String):int
+			{
+				
+				var i:int
+				for (i=0;i<acNiveles.length;i++)
+				{
+					if (acNiveles.getItemAt(i).id_role == nivel)
+						break	
+				}
+				return i
+			}
+			
+			private function getIdxacEmpresas(id_emprsa:String):int
+			{
+				var i:int
+				for (i=0;i<acDataClientId.length;i++)
+				{
+					if (this.acDataClientId.getItemAt(i).id_client == id_emprsa)
+						break	
+				}
+				return i
+			}
+			private function getIdxacCities(citiSigla:String):int
+			{
+				
+				var i:int
+				for (i=0;i<acDataCities.length;i++)
+				{
+					if (acDataCities.getItemAt(i).ciudad == citiSigla)
+						break	
+				}
+				return i
+			}
+			
+			
+			protected function btnValEx_clickHandler(event:MouseEvent):void
+			{
+				var arrColumns:Array = new Array()
+				// TODO Auto-generated method stub
+				this.vResult = NameV.validate()
+				if (vResult.type == ValidationResultEvent.INVALID) 
+					return
+					this.vResult = CedulaV.validate()
+				if (vResult.type == ValidationResultEvent.INVALID) 
+					return
+					trace("clicked no validate error")
+				event.currentTarget.enabled = false;	
+				if(isEdit)	// just included in query changed values..
+				{
+					if(tiNombre.text != acDataAllUsrs.getItemAt(usrId).nombre)
+						arrColumns.push({name:'nombre',value:tiNombre.text});
+					if(tiCedula.text != acDataAllUsrs.getItemAt(usrId).cedula)
+					{
+						//first lets check if this cedula is not used (to prevent violate Data base unique contrain) ....ojo por hacer, ver como hacerlo con validator custom
+						arrColumns.push({name:'cedula',value:tiCedula.text});
+					}	
+					if(this.cbPassword.selected)		// reset password request
+						arrColumns.push({name:'clave',value:defaultPassword});
+					if(this.cbEmpresa.selectedItem.id_client != acDataAllUsrs.getItemAt(usrId).empresa)
+						arrColumns.push({name:'empresa',value:cbEmpresa.selectedItem.id_client})
+					if(this.cbNivel.selectedItem.id_role != acDataAllUsrs.getItemAt(usrId).nivel)
+						arrColumns.push({name:'nivel',value:cbNivel.selectedItem.id_role});
+					if(this.tiSalario.text != acDataAllUsrs.getItemAt(usrId).salario)
+						arrColumns.push({name:'salario',value:int(tiSalario.text)})
+					var updateSrv:UpdateServers = new UpdateServers(gateway0,gateway1,
+						"users",
+						arrColumns,
+						"cedula",acDataAllUsrs.getItemAt(usrId).cedula,
+						"",numServ,serv1Name,serv2Name)
+					updateSrv.addEventListener(EventoCustom.EVENT_CUSTOM,onEventCustom)		
+							
+				}
+				else
+				{
+					
+				}
+			}
+			
+			private function onEventCustom(ev:EventoCustom):void
+				
+			{
+				//trace("proceso: "+ev.target.msgProcess)
+				if(ev.target.msgProcess == "END")
+				{
+					
+					this.lbMsgSrvs.text="";
+					parentApplication.refreshAllUsrList()
+					PopUpManager.removePopUp(this);
+				}
+				else
+					lbMsgSrvs.text = ev.target.msgProcess
+			}
+			
+
+			private function numberValidator_invalid(evt:ValidationResultEvent):void {
+				Alert.show(evt.message);
+			}
+			
+			private function numberValidator_valid(evt:ValidationResultEvent):void {
+				Alert.show(evt.type);
+			}
+			
+			private function getMaxSEC(_sede:String):String
+			{
+				var firstChar:String =""
+				var secondChar:String=	""
+				var arrAux:Array = new Array()
+				for(var i:int = 0; i < acDataAllUsrs.length;i++)
+				{
+					if(acDataAllUsrs.getItemAt(i).sede == _sede)
+					{
+						if (acDataAllUsrs.getItemAt(i).nivel < 30)
+							arrAux[i] = {"sec" : acDataAllUsrs.getItemAt(i).sec}
+					}
+						
+				}
+				if (arrAux.length>0)
+				{
+					var acAux:ArrayCollection = new ArrayCollection(arrAux)
+					var sort:Sort = new Sort();
+					var sortfield:SortField = new SortField("sec",true);
+					sort.fields=[sortfield];	
+					acAux.sort = sort
+					acAux.refresh()
+					
+					var maxSEC:String = acAux.getItemAt(0).sec 		
+
+					firstChar = maxSEC.substr(3,1)
+					secondChar =	maxSEC.substr(4,1)
+					var secondCode:int=secondChar.charCodeAt(0)	
+					var firstCode:int = firstChar.charCodeAt(0)	
+					if(secondCode > 90)	//next from Z in increment first chart and set second to A 
+					{
+						secondChar = "A"
+						firstChar = String.fromCharCode(firstCode + 1)	
+							
+					}
+					secondChar = String.fromCharCode(secondCode+1)	
+					//trace("FC: "+firstChar+" SC: "+newSecChar+" Code for A: "+a.charCodeAt(0)+" code for z: "+zeta.charCodeAt(0))							
+				}
+				return firstChar+secondChar
+			}
+			
+			
+			
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Define the data model. -->
+		<fx:Model id="formInfo">
+			<formData>
+				<nombre>{tiNombre.text}</nombre>
+				<cedula>{tiCedula.text}</cedula>
+			</formData>
+		</fx:Model>	
+		<!-- Define the validators. -->
+		<mx:StringValidator id="NameV"  
+							required="true"
+							source="{tiNombre}"
+							requiredFieldError="Campo Requerido"
+							property="text"
+							trigger="{btnValEx}"
+							triggerEvent="click"/>
+		<mx:StringValidator id="CedulaV"  
+							required="true"
+							source="{tiCedula}"
+							requiredFieldError="Campo Requerido"
+							property="text"
+							trigger="{btnValEx}"
+							triggerEvent="click"/>
+	</fx:Declarations>
+	<s:VGroup width="100%" >
+		<s:Form x="0" y="0" width="100%" height="157">
+			<s:HGroup width="100%" >
+				<s:VGroup width="50%" >
+					<s:FormItem width="100%" label="  Nombre:" >
+						<s:TextInput id="tiNombre" width="100%" change="changeAlltiHandler(event)"/>
+					</s:FormItem>
+					<s:FormItem width="100%" label="    Cédula:">
+						<s:TextInput id="tiCedula" width="100%" change="changeAlltiHandler(event)"
+									  restrict="0-9" maxChars="8"/>
+					</s:FormItem>
+					<s:FormItem width="100%" label="    Resetear Clave:">
+						<s:CheckBox id="cbPassword" width="100%" change="changeAlltiHandler(event)"/>
+					</s:FormItem>
+					
+				</s:VGroup>
+				<s:VGroup width="50%">
+					
+					
+					<s:HGroup width="100%">
+						<s:Label width="21%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Empresa:" textAlign="right"/>
+						<s:ComboBox id="cbEmpresa" width="79%"/>
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="21%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Nivel:" textAlign="right"/>
+						<s:ComboBox id="cbNivel" width="22%" 
+									keyDown="cbNivelKeysHandler(event)" 
+									keyUp="cbNivelKeysHandler(event)"
+									change="cbNivelChangeHandler(event)" />
+						<s:Label  id="lbCargo" width="57%" height="100%" fontStyle="italic"
+								 fontWeight="bold" paddingTop="5" text="Cargo:" textAlign="left"/>
+						
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="21%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Sede:" textAlign="right"/>
+						<s:ComboBox id="cbSede" width="63%"
+									keyDown="cbCityKeysHandler(event)" 
+									keyUp="cbCityKeysHandler(event)"
+									change="cbCityChangeHandler(event)"/>
+						<s:Label id="lbSedeLongName" width="16%" height="100%" fontStyle="italic"
+								 fontWeight="bold" paddingTop="5" text="www" textAlign="left"/>
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="21%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Salario:" textAlign="right"/>
+						<s:TextInput id="tiSalario" width="39%" change="changeAlltiHandler(event)"/>
+						<s:Label  id="lbSec" width="40%" height="100%" fontWeight="bold" paddingTop="5"
+								  textAlign="center" fontStyle="italic"/>
+					</s:HGroup>
+					<s:HGroup  width="100%" textAlign="center">
+						<s:Button id="btnValEx"  width="100%" click="btnValEx_clickHandler(event)"/>
+					</s:HGroup>
+				</s:VGroup>
+			</s:HGroup>
+			
+		</s:Form>
+		
+		
+		
+		
+	</s:VGroup>
+	<s:Label id="lbMsgSrvs" x="6" y="151" width="100%" height="38" color="#FF0000" textAlign="center"/>
+</s:TitleWindow>

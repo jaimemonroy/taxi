@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- http://blog.flexexamples.com/2009/10/23/displaying-a-popup-spark-titlewindow-container-in-flex-4/ -->
+<s:TitleWindow name="winNewConPrg"
+			   xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/halo"
+			   title="Seleccionar Historicos"
+			   width="306" height="318"
+			   creationComplete="{initWin()}"
+			   close="ttlWndw_close(event);" xmlns:mx2="library://ns.adobe.com/flex/mx">
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.events.Event;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			[Bindable]
+			public var acSucursales:ArrayCollection
+			
+			[Bindable]
+			public var acDigitals:ArrayCollection
+			
+			public var gateway : RemotingConnection;
+			
+			public var fecha:Date ;
+			
+			public var numSuc:int;
+			
+			
+			protected function ttlWndw_close(evt:CloseEvent):void {
+				PopUpManager.removePopUp(evt.currentTarget as IFlexDisplayObject);
+				
+			}
+			private function initWin():void
+			{
+				dfFecHist.selectedDate = fecha
+			}
+
+			private function activBtn():void
+			{
+				btnBuscar.enabled = true
+			}
+			private function btnActClikHand(ev:Event):void
+			{
+				trace ("voy a llamar una busqueda distinta..suc_num: "
+					+numSuc
+					+" Num door: "+acDigitals.getItemAt(listHistObjs.selectedIndex).dig_num
+					+" desde:"+setParams(1)
+					+" hasta: "+setParams(2));
+				/*parentApplication.nombrePuerta = acDigitals.getItemAt(listHistObjs.selectedIndex).dig_group+" "+acDigitals.getItemAt(listHistObjs.selectedIndex).dig_name
+				parentApplication.nombreSucHist = acSucursales.getItemAt(cbSucursales.selectedIndex).nombre
+				parentApplication.edo0Text = acDigitals.getItemAt(listHistObjs.selectedIndex).dct_edo0_text_alrm
+				parentApplication.edo1Text = acDigitals.getItemAt(listHistObjs.selectedIndex).dct_edo1_text_alrm*/
+				parentApplication.OpenDoorGraph(int(acDigitals.getItemAt(listHistObjs.selectedIndex).dig_num),
+												numSuc,
+												setParams(1),
+												setParams(2))
+				PopUpManager.removePopUp(this);
+				//gw.call("controles.insertPrgKon",doPrgCtrl,this.Name,this.kon_num,0,comment,lun,mar,mie,jue,vie,sab,dom,stOpen,stClose)	
+			//	gateway.call( "controles.insertPrgKon", new Responder(onInserCntrlPrg, onFault),name,konNum,0,comment.text,
+																	//	mo,tu,we,th,fr,sa,su,stOpen,stClose);	
+			}
+			private function onSelectSuc(result:Array):void
+			{
+				var item:Object;
+				var i:int=0;
+				for each(item in result)
+				{
+					item.label = item.dig_group+" "+item.dig_name
+					
+				}
+				acDigitals = new ArrayCollection(result)
+			}
+			private function setParams(cual:int):String
+			{
+				var param:String="";
+				switch (cual)
+				{
+					case 1:
+						param = "\""+dfFecHist.selectedDate.fullYear+"-"+
+						twoDigit(dfFecHist.selectedDate.month+1)+"-"+
+						twoDigit(dfFecHist.selectedDate.date)+" "+
+						twoDigit(horaDesde.value)+":"+
+						twoDigit(minDesde.value)+":"+
+						twoDigit(segDesde.value)+"\"";
+						//graphFecDesde = param;
+						break
+					case 2:
+						param = "\""+dfFecHist.selectedDate.fullYear+"-"+
+						twoDigit(dfFecHist.selectedDate.month+1)+"-"+
+						twoDigit(dfFecHist.selectedDate.date)+" "+
+						twoDigit(horaHasta.value)+":"+
+						twoDigit(minHasta.value)+":"+
+						twoDigit(segHasta.value)+"\"";
+						//graphFecHasta = param;
+						break;
+				}
+				return param
+			}
+			private function twoDigit(val:int):String
+			{
+				var valStr:String = (String(val).length == 1)? "0"+String(val) : String(val) ;
+				return valStr;
+			}
+			private function onFault( fault : String ) : void
+			{
+				trace( "Falla"+fault );
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Label x="15" y="14" text="Digitales:" width="273" textAlign="center" fontWeight="bold"/>
+	<s:Label x="12" y="197" text="Desde:" width="70" textAlign="right" fontWeight="bold"/>
+	<s:Label x="8" y="166" text="Fecha:" width="70" textAlign="right" fontWeight="bold"/>
+	<s:Label x="143" y="195" text=":" width="27" textAlign="center" fontWeight="bold"/>
+	<s:NumericStepper x="100" y="190" width="45" id="horaDesde" value="0" maximum="23"/>
+	<s:NumericStepper x="169" y="190" width="45" id="minDesde" value="0" maximum="59"/>
+	<s:NumericStepper x="240" y="190" width="45" id="segDesde" value="0" maximum="59"/>
+	<s:Label x="12" y="227" text="Hasta:" width="70" textAlign="right" fontWeight="bold"/>
+	<s:Label x="143" y="225" text=":" width="27" textAlign="center" fontWeight="bold"/>
+	<s:NumericStepper x="100" y="220" width="45" id="horaHasta" value="23" maximum="23"/>
+	<s:NumericStepper x="169" y="220" width="45" id="minHasta" value="59" maximum="59"/>
+	<s:NumericStepper x="240" y="220" width="45" id="segHasta" value="59" maximum="59"/>
+	<s:Label x="213" y="195" text=":" width="27" textAlign="center" fontWeight="bold"/>
+	<s:Label x="213" y="225" text=":" width="27" textAlign="center" fontWeight="bold"/>
+	<s:Button id="btnBuscar" x="10" y="252" label="Buscar" width="284" fontWeight="bold" enabled="false" click="btnActClikHand(event)"/>
+	<s:List x="15" y="34" width="273" height="115" id="listHistObjs" dataProvider="{acDigitals}" labelField="label" click="activBtn()"></s:List>
+	<mx2:DateField x="89" y="159" width="199" id="dfFecHist"/>
+	
+	
+	
+</s:TitleWindow>

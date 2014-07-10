@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow name="winEditServCli"
+			   xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:components="com.hillelcoren.components.*"
+			   title="Agendar Servicio"
+			   width="934" height="554"			   
+			   close="ttlWndw_close(event);" xmlns:mx2="library://ns.adobe.com/flex/mx">
+	<fx:Script>
+		<![CDATA[
+			import com.hillelcoren.components.AutoComplete;
+			import com.hurlant.util.der.Integer;
+			
+			import flash.events.Event;
+			import flash.events.TimerEvent;
+			import flash.utils.Timer;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.events.ValidationResultEvent;
+			import mx.managers.PopUpManager;
+			import mx.utils.ObjectProxy;
+			
+			import spark.collections.*;
+			import spark.events.IndexChangeEvent;
+			
+			public var servicioID:String=""
+			public var userSec:String=""	
+				
+			public var arrDataEmpresa:Array	
+			public var acDataSede:ArrayCollection
+			public var acDataEmpresa:ArrayCollection
+			[Bindable]	
+			private var acpasajeros:ArrayCollection
+			[Bindable]
+			private var aclugares:ArrayCollection
+			
+			
+			public var gateway0 : RemotingConnection;
+			public var gateway1 : RemotingConnection;
+			public var numServ:int = 1;
+			public var serv1Name:String=""
+			public var serv2Name:String=""
+			public var servStatus:Object
+			
+
+			
+			private var vResult:ValidationResultEvent;
+			
+			private var isEdit:Boolean; 
+			private var web_val:String="F"
+			private var clm_val:String="F"
+			private var bqt_val:String="F"
+			private var nextSec:String=""
+			private var Query:String=""
+				
+			private var updPax1:Boolean=false
+			private var updPax2:Boolean=false
+			private var updPax3:Boolean=false
+			private var updPax4:Boolean=false	
+			
+			private var currPaxUpd:int
+			private var numNewPax:int=0
+				
+			private var currSiteUpd:int
+			private var numNewSite:int=0
+			
+			
+			protected function ttlWndw_close(evt:CloseEvent):void {
+				
+				this.lbMsgSrvs.text="";
+				PopUpManager.removePopUp(evt.currentTarget as IFlexDisplayObject);
+				
+			}
+			
+			public function setNewEdit(que:Boolean):void
+			{
+				isEdit=que;
+				manageEnaDis(false,1)
+				manageEnaDis(false,2)
+				manageEnaDis(false,3)
+				manageEnaDis(false,4)
+				manageEnaDis(false,5)
+
+				var query:String = "SELECT id_client, nombre_corto, formato FROM clientes ORDER BY formato";
+				gateway0.call( "universalDBUpd.exQuery" , new Responder(onResultEmpresas, onFaultEmpresas),query)
+				
+				
+					
+				if(isEdit) //modify Service
+				{
+					this.btnNewSrv.label="Modificar"
+					Query = "UPDATE servicio SET "
+					
+						
+				}
+				else	//New Sevice
+				{
+					
+					this.btnNewSrv.label="Ingresar"
+					this.dfFechSrv.selectedDate = new Date((new Date()).getTime() + 2*(1000*60*60*24));	
+					this.dfFechSrv.toolTip = "Para agendar servicios con fecha menor a la aquí permtida, dirijirse a un coordinador de tranporte Quiroga"
+					Query = "INSERT INTO servicio VALUES(";
+					trace("Calling getNextId_Table with sec:"+userSec)
+					gateway0.call("universalDBUpd.getNextId_Table",new Responder(onResultNextId, onFaultNextId),userSec,"servicio")
+					//get max seq from a call to DB:
+					
+				}
+
+					
+			}
+			
+			public function refreshSitesList(ev:Event):void
+			{
+				trace ("REFRESCO DE LISTA DE SITIOS POR RETORNO")
+				
+				var query:String = "SELECT sitio,id_site FROM sitios ORDER BY sitio"
+				gateway0.call( "universalDBUpd.exQuery" , new Responder(onResultSiteList, onFaultSiteList),query)
+			}
+			
+			public function refreshPaxList(ev:Event):void
+			{
+				var query:String = "SELECT id_pax, pax_name, cel_phone FROM pax WHERE id_client = '"+this.acDataEmpresa.getItemAt(this.cbEmpresa.selectedIndex).id_client+"' ORDER BY pax_name";
+				trace ("Calling Query: "+query)
+				gateway0.call( "universalDBUpd.exQuery" , new Responder(onResultPaxList, onFaultPaxList),query)	
+			}
+			private function onResultEmpresas(result:Array):void
+			{
+				for(var s:String in result) result[s] = new ObjectProxy(result[s]);
+				acDataEmpresa = new ArrayCollection (result);
+				this.cbEmpresa.dataProvider = this.acDataEmpresa
+				this.cbEmpresa.labelField="nombre_corto"
+				//this.cbEmpresa.selectedIndex = -1;
+				//arrDataEmpresa = result;
+				var query:String = "SELECT * FROM ciudades where sede = 't'"
+				gateway0.call( "universalDBUpd.exQuery" , new Responder(onResultListCIties, onFaultCitiesList),query)
+				
+			}
+			
+			private function onResultListCIties(result:Array):void
+			{
+				
+				for(var s:String in result) result[s] = new ObjectProxy(result[s]);
+				this.acDataSede=new ArrayCollection (result);
+				this.cbRegion.dataProvider=this.acDataSede
+				this.cbRegion.labelField="ciudad"
+				var query:String = "SELECT * FROM ciudades where sede = 't'"
+				gateway0.call( "universalDBUpd.exQuery" , new Responder(onResultListCIties, onFaultCitiesList),query)	
+				
+			}
+			
+
+			private function onResultNextId(result:String):void
+			{
+				this.lbNumero.text = result;
+			}
+
+			private function manageEnaDis(que:Boolean,cuales:int):void
+			{
+				if(cuales== 1)	// all buttons
+				{
+					this.btnChangeOrigDest.enabled=que;
+					this.btnNewPax.enabled=que;
+					this.btnNewSrv.enabled=que;
+					this.btnNewSite.enabled=que;
+				}
+				for(var i:int=1;i<5;i++)
+				{	
+					switch (cuales)
+					{	
+						case 2:// PASAJEROS en/dis
+							this["tiPasagero"+i].enabled=que;
+						break
+						case 3: //TELFS en/dis
+							this["tiTelef"+i].enabled=que;;
+						break
+						case 4://origenes en/dis
+							this["tiOrig"+i].enabled=que;
+						break
+						case 5://destinos en/dis
+							this["tiDest"+i].enabled=que;
+						break
+						case 6:// PASAJEROS blank text
+							this["tiPasagero"+i].selectedItem ="";
+						break
+						case 7: //TELFS blank text
+							this["tiTelef"+i].text = "";
+						break
+						case 8://origenes blank text
+							this["tiOrig"+i].selectedItem ="";
+							break
+						case 9://destinos blank text
+							this["tiDest"+i].selectedItem ="";
+						break
+					}
+				}
+			}
+			
+			
+			private function onFaultCitiesList(fault:String):void
+			{
+				trace("AMFPHP winEditServCli: Fail on get cities sedes: "+fault)
+			}
+			private function onFaultEmpresas(fault:String):void
+			{
+				trace("AMFPHP winEditServCli: Fail on get empresas: "+fault)
+			}
+			private function onFaultNextId(fault:String):void
+			{
+				trace("AMFPHP winEditServCli: Fail on getNextId_Serv: "+fault)
+			}
+			private function onFaultPaxList(fault:String):void
+			{
+				trace("AMFPHP winEditServCli: Fail on get passagers for empresa: "+fault)
+			}
+			private function onFaultSiteList(fault:String):void
+			{
+				trace("AMFPHP winEditServCli: Fail on get all defins sites: "+fault)
+			}
+			//
+			private function btnAgendarSrvCli_clickHandler(ev:MouseEvent):void
+			{
+				var i:int=0
+				//disable all stuff
+				manageEnaDis(false,1)
+				manageEnaDis(false,2)
+				manageEnaDis(false,3)
+				manageEnaDis(false,4)
+				manageEnaDis(false,5)
+				//fist lets check the two cross refernce tables to be inserted
+				// check how my passengers has been set an if any is a new pax because that is the firs thing to do: insert new defined passangers in pax table
+				insertCrosPax(0)
+	
+			}
+			private function insertCrosPax(num:int):void
+			{
+				currPaxUpd=num
+				currPaxUpd+=1	
+				if(this["tiPasagero"+currPaxUpd].text != "")
+				{
+					var strInsert:String = "'"+this.lbNumero.text+"',"						//id_serv
+					strInsert+=	"'"+this["tiPasagero"+currPaxUpd].selectedItem.id_pax+"'"	//+getIdPax(this["tiPasagero"+currPaxUpd].text)+"'"; 	//id_pax
+					var insertSrv:InsertServers = new InsertServers(gateway0,gateway1,
+						"crosrefpax",strInsert,
+						"ACT.REFERENCIAS CRUZADAS PASAJEROS",
+						this.numServ,this.serv1Name,this.serv2Name)
+					insertSrv.addEventListener(EventoCustom.EVENT_CUSTOM,onEventCustom)
+				}
+
+				else
+				{
+					
+					if(currPaxUpd<4)
+						insertCrosPax(currPaxUpd)
+					else
+						insertCrosSite(0)
+				}
+						
+			}
+			
+			
+			
+			private function getIdPax(nombre:String):String
+			{
+				trace("nombre recibido por getIdPax: "+nombre)
+				for (var i:int=0; this.acpasajeros.length;i++)
+				{
+					if(acpasajeros.getItemAt(i).pax_name == nombre)
+						return acpasajeros.getItemAt(i).id_pax
+				}
+				return ""
+			}
+			
+			private function insertCrosSite(num:int):void
+			{
+				currSiteUpd=num
+				currSiteUpd+=1	
+				if(currSiteUpd<5)
+				{
+					if(this["tiOrig"+currSiteUpd].text != "")
+					{
+						var strInsert:String = "'"+this.lbNumero.text+"',"						//id_serv
+						strInsert += "'"+currSiteUpd+"',";										//orden	
+						strInsert += "'"+this["tiOrig"+currSiteUpd].selectedItem.id_site+"'"	//id_site
+					}
+				}
+				else
+				{
+					
+				}
+				
+			}
+			private function onEventCustom(ev:EventoCustom):void
+			{
+				//trace("proceso: "+ev.target.msgProcess)
+				if(ev.target.msgProcess == "ENDpax")
+				{
+					this.lbMsgSrvs.text="";
+					
+				}
+				else if(ev.target.msgProcess == "ENDcrosrefpax")
+				{
+					this.lbMsgSrvs.text="";
+					if(currPaxUpd<5)
+						insertCrosPax(currPaxUpd)
+					else
+						insertCrosSite(1)
+				}
+				else if(ev.target.msgProcess == "ENDcrosrefsite")
+				{
+					
+				}
+				else if(ev.target.msgProcess == "ENDservicio")
+				{
+					
+				}
+				else
+					lbMsgSrvs.text = ev.target.msgProcess
+			}
+			
+			private function changeIiPaxHandler(ev:Event):void
+			{
+				var name:String = ev.currentTarget.id
+				var butName:String= "btnAcpax"+name.substr(10,1)
+				var tiCel:String= "tiTelef"+name.substr(10,1)
+				var currUpdPax:String = "updPax"+name.substr(10,1)	
+				trace("autoCompleted: "+ev.currentTarget.id+" selected name lenght:"+ev.currentTarget.text) //+" seleted item: "+ev.currentTarget.selectedItem.id_pax)
+				if(ev.currentTarget.text == "")
+				{
+
+					this[tiCel].text = ""
+				}
+				else
+				{
+					setMainButtonActivate()
+					if(!isNewValue(true,ev.currentTarget.text))
+					{
+						//ev.currentTarget.selectedItemStyleName="google"
+						this[tiCel].text =	ev.currentTarget.selectedItem.cel_phone
+						this[tiCel].enabled = false
+						this[currUpdPax] = false	
+					}
+					else
+					{
+						this[tiCel].enabled = true
+						//ev.currentTarget.selectedItemStyleName="underline"	
+						this[currUpdPax] = true	
+					}
+				}
+			}
+			
+			private function changeIiSiteHandler(ev:Event):void
+			{
+				var name:String = ev.currentTarget.id
+				var currUpdSite:String="updSite"+name.substr(6,1)
+				trace("Site upd val: "+	currUpdSite)
+				setMainButtonActivate()
+			}
+			
+			private function changeAlltiHandler(ev:Event):void
+			{
+				
+			}
+			
+			protected function allCb_changeHandler(event:IndexChangeEvent):void
+			{
+				var query:String
+				trace("combo box  change: "+event.currentTarget.id+" index:"+event.target.selectedIndex) //+" sede: "+acDataSede.getItemAt(event.currentTarget.selectedIndex).sigla)
+				if(event.currentTarget.id == "cbEmpresa")
+				{
+					manageEnaDis(true,6)
+					manageEnaDis(true,7)
+					query = "SELECT id_pax, pax_name, cel_phone FROM pax WHERE id_client = '"+this.acDataEmpresa.getItemAt(event.target.selectedIndex).id_client+"' ORDER BY pax_name";
+					trace ("Calling Query: "+query)
+					gateway0.call( "universalDBUpd.exQuery" , new Responder(onResultPaxList, onFaultPaxList),query)	
+					
+				}
+				else if(event.currentTarget.id == "cbRegion")
+				{
+					query = "SELECT sitio,id_site FROM sitios ORDER BY sitio"
+					gateway0.call( "universalDBUpd.exQuery" , new Responder(onResultSiteList, onFaultSiteList),query)	
+				}
+				
+			}
+			
+			
+			
+			private function onResultPaxList (result:Array):void
+			{
+				for(var s:String in result) result[s] = new ObjectProxy(result[s]);
+				this.acpasajeros=new ArrayCollection(result);
+				
+				manageEnaDis(true,2)
+				manageEnaDis(true,3)
+				this.btnNewPax.enabled=true;
+			}
+			private function onResultSiteList(result:Array):void
+			{
+				for(var s:String in result) result[s] = new ObjectProxy(result[s]);
+				this.aclugares= new ArrayCollection(result);
+				manageEnaDis(true,4)
+				manageEnaDis(true,5)
+				this.btnNewSite.enabled=true
+			}
+			
+			private function isNewValue(option:Boolean,value:String):Boolean
+			{
+				var isNew:Boolean=true
+				var i:int=0
+				if(option)//search in pasajeros
+				{
+					for	(i=0;i<this.acpasajeros.length;i++)
+						if(acpasajeros.getItemAt(i).pax_name == value)
+							return false
+					
+				}
+				else// search places
+				{
+					
+				}
+				return isNew	
+			}
+			
+			private function setMainButtonActivate():void
+			{
+				//here is the logic to enable the main button active
+				if(tiPasagero1.text != "" && tiOrig1.text != "")
+					this.btnNewSrv.enabled=true
+				else
+					this.btnNewSrv.enabled=false
+			}
+			
+			
+			protected function btnNewPax_clickHandler(event:MouseEvent):void
+			{
+				trace ("click boton crear nuevo Pasajero")
+				var winCrPx:winCreatePax = PopUpManager.createPopUp(this,winCreatePax,true) as winCreatePax
+				winCrPx.gateway0 = this.gateway0
+				winCrPx.gateway1 = this.gateway1
+				winCrPx.numServ = this.numServ
+				winCrPx.serv1Name = this.serv1Name
+				winCrPx.serv2Name = this.serv2Name
+				winCrPx.userSec = this.userSec
+				winCrPx.cliente = this.acDataEmpresa.getItemAt(this.cbEmpresa.selectedIndex).id_client
+				winCrPx.addEventListener(EventoCustom.EVENT_CLOSE_WIN,refreshPaxList)
+				PopUpManager.centerPopUp(winCrPx)
+			}
+			protected function btnNewSite_clickHandler(event:MouseEvent):void
+			{
+				// TODO Auto-generated method stub
+				trace ("click boton crear nuevo sitio")
+				var winCrSt:winCreateSite = PopUpManager.createPopUp(this,winCreateSite,true) as winCreateSite
+				winCrSt.gateway0 = this.gateway0
+				winCrSt.gateway1 = this.gateway1
+				winCrSt.numServ = this.numServ
+				winCrSt.serv1Name = this.serv1Name
+				winCrSt.serv2Name = this.serv2Name
+				winCrSt.userSec = this.userSec
+				winCrSt.setupWinCreateSite()
+					
+				winCrSt.addEventListener(EventoCustom.EVENT_CLOSE_WIN,refreshSitesList)
+				PopUpManager.centerPopUp(winCrSt)
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Define the data model. -->
+			
+		<!-- Define the validators. -->
+		
+	</fx:Declarations>
+	<s:VGroup width="100%" >
+		<s:Form x="0" y="0" width="100%" height="90%">
+<!-- REGION/EMPRESA-->			
+			<s:HGroup width="100%" >
+						<s:Label width="7%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Número:" textAlign="right"/>
+						<s:Label id="lbNumero" width="13%" fontWeight="bold" paddingTop="5"
+						 textAlign="center" fontStyle="italic"/>
+						<s:Label width="10%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Región:" textAlign="right"/>
+						<s:ComboBox  id="cbRegion" width="20%" change="allCb_changeHandler(event)"/>
+
+
+						<s:Label width="10%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Empresa:" textAlign="right"/>
+						<s:ComboBox id="cbEmpresa" width="40%" change="allCb_changeHandler(event)"/>
+
+			</s:HGroup>	
+				
+			
+				<s:VGroup width="100%" >
+<!-- PASAJEROS /TELEFONOS-->					
+					<s:HGroup width="100%" >
+						<s:Label width="12%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Pasajero 1:" textAlign="right"/>
+						<components:AutoComplete  id="tiPasagero1" width="48%" 
+												 toolTip="Escriba las primeras etras del nombre para verificar si el pasajero ya esta definido"  
+												 dataProvider="{acpasajeros}" labelField="pax_name" change="changeIiPaxHandler(event)" />
+						<s:Label width="12%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Teléfono 1:" textAlign="right"/>
+						<s:Label id="tiTelef1" width="28%" height="100%" fontWeight="bold" fontStyle="italic" paddingTop="5" textAlign="left"/>
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="12%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Pasajero 2:" textAlign="right"/>
+						<components:AutoComplete id="tiPasagero2" width="48%" 
+												 toolTip="Escriba las primeras etras del nombre para verificar si el pasajero ya esta definido"  
+												 dataProvider="{acpasajeros}" labelField="pax_name" change="changeIiPaxHandler(event)" />
+						<s:Label width="12%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Teléfono 2:" textAlign="right"/>
+						<s:Label id="tiTelef2" width="28%" height="100%" fontWeight="bold" fontStyle="italic" paddingTop="5" textAlign="left"/>
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="12%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Pasajero 3:" textAlign="right"/>
+						<components:AutoComplete id="tiPasagero3" width="48%" 
+												 toolTip="Escriba las primeras etras del nombre para verificar si el pasajero ya esta definido"  
+												 dataProvider="{acpasajeros}" labelField="pax_name" change="changeIiPaxHandler(event)" />
+						<s:Label width="12%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Teléfono 3:" textAlign="right"/>
+						<s:Label id="tiTelef3" width="28%" height="100%" fontWeight="bold" fontStyle="italic" paddingTop="5" textAlign="left"/>
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="12%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Pasajero 4:" textAlign="right"/>
+						<components:AutoComplete id="tiPasagero4" width="48%" 
+												 toolTip="Escriba las primeras etras del nombre para verificar si el pasajero ya esta definido"  
+												 dataProvider="{acpasajeros}" labelField="pax_name" change="changeIiPaxHandler(event)" />
+						<s:Label width="12%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Teléfono 4:" textAlign="right"/>
+						<s:Label id="tiTelef4" width="28%" height="100%" fontWeight="bold" fontStyle="italic" paddingTop="5" textAlign="left"/>
+					</s:HGroup>
+
+<!-- ORIGENES/DESTINOS-->
+					<s:HGroup width="100%" >
+						<s:Label width="7%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Origen 1:" textAlign="right"/>
+						<components:AutoComplete id="tiOrig1" width="73%" 
+												 toolTip="Escriba las primeras etras del Sitio para verificar si ya esta definido"  
+												 dataProvider="{aclugares}" labelField="sitio" change="changeIiSiteHandler(event)" />
+						<s:Label width="8%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Vuelo/Hora:" textAlign="right"/>
+						<s:TextInput id="tiVueHor" width="12%" change="changeAlltiHandler(event)"/>
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="7%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Destino 1:" textAlign="right"/>
+						<components:AutoComplete id="tiDest1" width="73%" 
+												 toolTip="Escriba las primeras etras del Sitio para verificar si ya esta definido"  
+												 dataProvider="{aclugares}" labelField="sitio" change="changeIiSiteHandler(event)" />
+						<s:Label width="18%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Disposición:" textAlign="right"/>
+						<s:CheckBox id="chbDisposicion" change="changeAlltiHandler(event)"/>
+					</s:HGroup>	
+					<s:HGroup width="100%" >
+						<s:Label width="7%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Origen 2:" textAlign="right"/>
+						<components:AutoComplete id="tiOrig2" width="73%" 
+												 toolTip="Escriba las primeras etras del Sitio para verificar si ya esta definido"  
+												 dataProvider="{aclugares}" labelField="sitio" change="changeIiSiteHandler(event)" />
+						<s:Label width="18%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Viaje Retorno:" textAlign="right"/>
+						<s:CheckBox id="chbViajeRet" fontWeight="bold" textAlignLast="center"/>
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="7%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Destino 2:" textAlign="right"/>
+						<components:AutoComplete id="tiDest2" width="73%" 
+												 toolTip="Escriba las primeras etras del Sitio para verificar si ya esta definido"  
+												 dataProvider="{aclugares}" labelField="sitio" change="changeIiSiteHandler(event)" />
+						<s:Label width="10%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Código UA:" textAlign="right"/>
+						<s:TextInput id="tiCodUA" width="10%" change="changeAlltiHandler(event)"/>
+						
+						
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="7%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Origen 3:" textAlign="right"/>
+						<components:AutoComplete id="tiOrig3" width="73%" 
+												 toolTip="Escriba las primeras etras del Sitio para verificar si ya esta definido"  
+												 dataProvider="{aclugares}" labelField="sitio" change="changeIiSiteHandler(event)" />
+						<s:Label width="10%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Código UE:" textAlign="right"/>
+						<s:TextInput id="tiCodUE" width="10%" change="changeAlltiHandler(event)"/>
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="7%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Destino 3:" textAlign="right"/>
+						<components:AutoComplete id="tiDest3" width="73%" 
+												 toolTip="Escriba las primeras etras del Sitio para verificar si ya esta definido"  
+												 dataProvider="{aclugares}" labelField="sitio" change="changeIiSiteHandler(event)" />
+						<s:Label width="8%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Fecha:" textAlign="right"/>
+						<mx:DateField id="dfFechSrv" disabledRanges="{[{rangeEnd: new Date((new Date()).getTime() + (1000*60*60*24))}]}" width="12%"/>	
+						
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="7%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Origen 4:" textAlign="right"/>
+						<components:AutoComplete id="tiOrig4" width="73%" 
+												 toolTip="Escriba las primeras etras del Sitio para verificar si ya esta definido"  
+												 dataProvider="{aclugares}" labelField="sitio" change="changeIiSiteHandler(event)" />
+						<s:Label width="5%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Hora:" textAlign="right"/>
+						<s:NumericStepper id="nsHour" width="6%" minimum="0" maximum="23" />
+						<s:Label width="2%" height="100%" fontWeight="bold" paddingTop="5"
+								 text=" :" textAlign="center"/>
+						<s:NumericStepper id="nsMinute" minimum="0" maximum="59" width="6%"/>
+						
+						
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="7%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Destino 4:" textAlign="right"/>
+						<components:AutoComplete id="tiDest4" width="73%" 
+												 toolTip="Escriba las primeras etras del Sitio para verificar si ya esta definido"  
+												 dataProvider="{aclugares}" labelField="sitio" change="changeIiSiteHandler(event)" />
+						
+					</s:HGroup>
+					<s:HGroup width="100%" horizontalAlign="center" verticalAlign="middle">
+						<s:Button id="btnNewPax" label="Crear Nuevo Pasajero" width="30%" click="btnNewPax_clickHandler(event)"/>
+						<s:Button id="btnNewSite" label="Crear Nuevo Sitio" width="30%" click="btnNewSite_clickHandler(event)"/>
+						<s:Button id="btnChangeOrigDest" width="30%" label="Intercambiar Origenes/Destinos" click="btnAgendarSrvCli_clickHandler(event)"/>
+					</s:HGroup>
+					<s:HGroup width="100%" >
+						<s:Label width="7%" height="100%" fontWeight="bold" paddingTop="5"
+								 text="Notas:" textAlign="center"/>
+						<s:TextInput id="tiNotas" width="100%"/>
+					</s:HGroup>	
+				</s:VGroup>
+				<s:HGroup width="100%" horizontalAlign="center" verticalAlign="middle">
+					<s:Button id="btnNewSrv" width="50%" label="new" click="btnAgendarSrvCli_clickHandler(event)"/>
+				</s:HGroup>
+				<s:HGroup width="100%">
+					<s:Label id="lbMsgSrvs" width="100%" color="#FF0000"/>
+				</s:HGroup>
+			
+		</s:Form>		
+	</s:VGroup>
+	
+	
+	
+	
+</s:TitleWindow>
